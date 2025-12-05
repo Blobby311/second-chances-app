@@ -1,0 +1,24 @@
+# VeggieRoulette Project Rules
+
+## Design Style
+
+- **Theme**: Earth tones theme
+- **Background**: #365441 (Dark Green)
+- **Primary Headers**: #2C4A34 (Dark Green)
+- **Accent/Buttons**: #C85E51 (Terracotta)
+- **Rounded corners**: 2xl or 3xl
+
+## Code Rules
+
+- Use `FlatList` for all scrolling lists
+- Use strict Mock Data arrays at the top of files (e.g., `const DATA = [...]`) so backend team can replace them easily later
+- Add `// TODO:` comments where API calls should happen
+- Use file-based routing (Expo Router)
+
+## Tech Stack
+
+- React Native
+- Expo Router
+- NativeWind (Tailwind CSS)
+- Lucide Icons
+
