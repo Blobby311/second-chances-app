@@ -31,6 +31,13 @@
     "scheme": "veggieroulette",
     "plugins": [
       "expo-router"
-    ]
+    ],
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "1a486ba9-18fc-4d13-81b2-f7b1c243a542"
+      }
+    },
+    "owner": "blobby31"
   }
 }

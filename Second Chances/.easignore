@@ -1,0 +1,17 @@
+AppData/**
+**/AppData/**
+Temp/**
+**/Temp/**
+WinSAT/**
+**/WinSAT/**
+**/Cache/**
+**/Cache_Data/**
+**/Code Cache/**
+**/Service Worker/**
+*.log
+*.lnk
+node_modules
+.git
+.expo
+dist
+build

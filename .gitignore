@@ -1,0 +1,19 @@
+# Ignore everything inside child node_modules / builds
+**/node_modules/
+**/dist/
+**/build/
+**/uploads/
+**/.env
+
+# Windows folder issues
+AppData/
+Temp/
+*/AppData/
+*/Temp/
+
+# Logs
+*.log
+
+# Editor files
+.vscode/
+.idea/
