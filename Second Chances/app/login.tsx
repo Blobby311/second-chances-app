@@ -1,14 +1,55 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, ScrollView, Switch, Image } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, ScrollView, Switch, Image, ActivityIndicator } from 'react-native';
 import { Link, useRouter } from 'expo-router';
 import { User, Eye, EyeOff } from 'lucide-react-native';
 import { FontAwesome5, MaterialIcons } from '@expo/vector-icons';
 import '../global.css';
 
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL || 'http://localhost:3000';
+
 export default function LoginScreen() {
   const router = useRouter();
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  const handleLogin = async () => {
+    if (!email || !password) {
+      setError('Email and password are required');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      setError('');
+
+      const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email, password }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        const message = data?.errors?.[0]?.msg || data?.error || 'Login failed';
+        setError(message);
+        return;
+      }
+
+      // TODO: Persist token/rememberMe once storage is decided
+      router.push('/role-selection');
+    } catch (err) {
+      setError('Unable to reach server. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <View className="flex-1" style={{ backgroundColor: '#365441' }}>
@@ -53,10 +94,14 @@ export default function LoginScreen() {
               style={{ backgroundColor: '#E8F3E0' }}
             >
               <TextInput
-                placeholder="Username"
+                placeholder="Email"
                 placeholderTextColor="#6b7280"
                 className="flex-1 text-base"
                 style={{ color: '#2C4A34', fontFamily: 'System' }}
+                value={email}
+                onChangeText={setEmail}
+                autoCapitalize="none"
+                keyboardType="email-address"
               />
               <User size={20} stroke="#6b7280" />
             </View>
@@ -74,12 +119,23 @@ export default function LoginScreen() {
                 secureTextEntry={!showPassword}
                 className="flex-1 text-base"
                 style={{ color: '#2C4A34', fontFamily: 'System' }}
+                value={password}
+                onChangeText={setPassword}
+                autoCapitalize="none"
               />
               <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
                 {showPassword ? <EyeOff size={20} stroke="#6b7280" /> : <Eye size={20} stroke="#6b7280" />}
               </TouchableOpacity>
             </View>
           </View>
+
+          {error ? (
+            <View className="mb-3">
+              <Text className="text-sm" style={{ color: '#C85E51', fontFamily: 'System' }}>
+                {error}
+              </Text>
+            </View>
+          ) : null}
 
           {/* Remember Me */}
           <View className="flex-row items-center">
@@ -98,14 +154,17 @@ export default function LoginScreen() {
         {/* Login Button */}
         <TouchableOpacity 
           className="bg-terracotta py-4 px-8 rounded-3xl items-center mb-6"
-          onPress={() => {
-            // TODO: Handle login
-            router.push('/role-selection');
-          }}
+          onPress={handleLogin}
+          disabled={loading}
+          style={{ opacity: loading ? 0.7 : 1 }}
         >
-          <Text className="text-white text-lg font-bold uppercase" style={{ fontFamily: 'System' }}>
-            LOGIN
-          </Text>
+          {loading ? (
+            <ActivityIndicator color="#ffffff" />
+          ) : (
+            <Text className="text-white text-lg font-bold uppercase" style={{ fontFamily: 'System' }}>
+              LOGIN
+            </Text>
+          )}
         </TouchableOpacity>
 
         {/* OR Separator */}
