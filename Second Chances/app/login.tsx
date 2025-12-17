@@ -4,8 +4,7 @@ import { Link, useRouter } from 'expo-router';
 import { User, Eye, EyeOff } from 'lucide-react-native';
 import { FontAwesome5, MaterialIcons } from '@expo/vector-icons';
 import '../global.css';
-
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL || 'http://localhost:3000';
+import { API_URL } from './config/api';
 
 export default function LoginScreen() {
   const router = useRouter();
@@ -26,7 +25,7 @@ export default function LoginScreen() {
       setLoading(true);
       setError('');
 
-      const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
+      const response = await fetch(`${API_URL}/api/auth/login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
