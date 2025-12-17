@@ -1,5 +1,6 @@
 import express, { Response } from 'express';
-import { Mission, UserMission } from '../models/Mission';
+import { Mission } from '../models/Mission';
+import UserMission from '../models/Mission';
 import { authenticate, AuthRequest } from '../middleware/auth';
 import PointsTransaction from '../models/Points';
 import Notification from '../models/Notification';

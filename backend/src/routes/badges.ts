@@ -1,5 +1,6 @@
 import express, { Response } from 'express';
-import { Badge, UserBadge } from '../models/Badge';
+import { Badge } from '../models/Badge';
+import UserBadge from '../models/Badge';
 import { authenticate, AuthRequest } from '../middleware/auth';
 
 const router = express.Router();
