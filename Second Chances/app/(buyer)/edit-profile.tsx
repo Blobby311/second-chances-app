@@ -1,23 +1,18 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StatusBar, Image, Alert } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StatusBar, Image, Alert, ActivityIndicator } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { ArrowLeft } from 'lucide-react-native';
 import '../../global.css';
-
-// TODO: Replace with API call
-const INITIAL_USER_DATA = {
-  name: 'Ahmad',
-  email: 'ahmad@example.com',
-  phone: '+60123456789',
-  avatar: 'https://i.pinimg.com/236x/fd/88/22/fd88222b6ea609087ebced0e544d1eb1.jpg',
-};
+import { API_URL } from '../../config/api';
+import { getAuthToken } from '../../config/auth';
 
 export default function EditProfileScreen() {
   const router = useRouter();
   const params = useLocalSearchParams();
-  const [name, setName] = useState(INITIAL_USER_DATA.name);
-  const [email, setEmail] = useState(INITIAL_USER_DATA.email);
-  const [phone, setPhone] = useState(INITIAL_USER_DATA.phone);
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     if (params.name) setName(params.name as string);
@@ -25,9 +20,48 @@ export default function EditProfileScreen() {
     if (params.phone) setPhone(params.phone as string);
   }, [params]);
 
-  const handleSave = () => {
-    // TODO: Call API to save profile changes
-    router.back();
+  const handleSave = async () => {
+    if (!name.trim()) {
+      Alert.alert('Error', 'Name is required');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const token = getAuthToken();
+      if (!token) {
+        Alert.alert('Error', 'You need to be logged in');
+        router.replace('/login');
+        return;
+      }
+
+      const response = await fetch(`${API_URL}/api/user/profile`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          name: name.trim(),
+          phone: phone.trim() || undefined,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        Alert.alert('Error', data?.error || 'Failed to update profile');
+        return;
+      }
+
+      Alert.alert('Success', 'Profile updated successfully', [
+        { text: 'OK', onPress: () => router.back() },
+      ]);
+    } catch (error) {
+      Alert.alert('Error', 'Unable to update profile. Please try again.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleCancel = () => {
@@ -53,19 +87,6 @@ export default function EditProfileScreen() {
       </View>
 
       <View className="flex-1 px-4 pt-8">
-        {/* Profile Picture */}
-        <View className="items-center mb-8">
-          <Image
-            source={{ uri: INITIAL_USER_DATA.avatar }}
-            style={{ width: 100, height: 100, borderRadius: 50, marginBottom: 12 }}
-          />
-          <TouchableOpacity>
-            <Text className="text-base font-semibold" style={{ color: '#E8F3E0', fontFamily: 'System' }}>
-              Change Photo
-            </Text>
-          </TouchableOpacity>
-        </View>
-
         {/* Name Input */}
         <View className="mb-4">
           <Text className="text-sm font-semibold mb-2" style={{ color: '#E8F3E0', fontFamily: 'System' }}>
@@ -81,16 +102,16 @@ export default function EditProfileScreen() {
           />
         </View>
 
-        {/* Email Input */}
+        {/* Email Input - Read Only */}
         <View className="mb-4">
           <Text className="text-sm font-semibold mb-2" style={{ color: '#E8F3E0', fontFamily: 'System' }}>
-            Email
+            Email (cannot be changed)
           </Text>
           <TextInput
             className="px-4 py-3 rounded-2xl"
-            style={{ backgroundColor: '#E8F3E0', color: '#2C4A34', fontFamily: 'System' }}
+            style={{ backgroundColor: '#E8F3E0', color: '#6b7280', fontFamily: 'System' }}
             value={email}
-            onChangeText={setEmail}
+            editable={false}
             placeholder="Enter your email"
             placeholderTextColor="#6b7280"
             keyboardType="email-address"
@@ -118,11 +139,16 @@ export default function EditProfileScreen() {
         <TouchableOpacity
           onPress={handleSave}
           className="py-4 rounded-2xl mb-4"
-          style={{ backgroundColor: '#C85E51' }}
+          style={{ backgroundColor: '#C85E51', opacity: loading ? 0.7 : 1 }}
+          disabled={loading}
         >
-          <Text className="text-base font-semibold text-center" style={{ color: '#ffffff', fontFamily: 'System' }}>
-            Save
-          </Text>
+          {loading ? (
+            <ActivityIndicator color="#ffffff" />
+          ) : (
+            <Text className="text-base font-semibold text-center" style={{ color: '#ffffff', fontFamily: 'System' }}>
+              Save
+            </Text>
+          )}
         </TouchableOpacity>
 
         {/* Cancel Button */}

@@ -1,39 +1,76 @@
-import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, StatusBar, ScrollView, Switch, Alert, Image } from 'react-native';
-import { useRouter } from 'expo-router';
+import React, { useState, useEffect } from 'react';
+import { View, Text, TouchableOpacity, StatusBar, ScrollView, Switch, Alert, Image, ActivityIndicator } from 'react-native';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { ArrowLeft, Pencil, ChevronRight, User, Bell, ShieldCheck, Info } from 'lucide-react-native';
 import '../../global.css';
 import { API_URL } from '../../config/api';
 import { getAuthToken, clearAuthToken } from '../../config/auth';
 
-// TODO: Replace with API call
-const USER_DATA = {
-  id: '1',
-  name: 'ChuaWasHere',
-  fullName: 'ChuaWasHere',
-  email: 'chuaeyo@example.com',
-  phone: '+60123456789',
-  avatar:
-    'https://i.pinimg.com/236x/fd/88/22/fd88222b6ea609087ebced0e544d1eb1.jpg',
-};
-
-// TODO: Replace with API call
 const APP_VERSION = 'v1.0.2';
 
 export default function SettingsScreen() {
   const router = useRouter();
+  const [userData, setUserData] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
   const [orderUpdates, setOrderUpdates] = useState(true);
   const [promoUpdates, setPromoUpdates] = useState(false);
   const [communityUpdates, setCommunityUpdates] = useState(true);
   const [isSeller, setIsSeller] = useState(false);
 
+  const fetchUserProfile = async () => {
+    try {
+      const token = getAuthToken();
+      if (!token) {
+        router.replace('/login');
+        return;
+      }
+
+      const response = await fetch(`${API_URL}/api/user/profile`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        if (response.status === 401) {
+          await clearAuthToken();
+          router.replace('/login');
+          return;
+        }
+        throw new Error('Failed to fetch profile');
+      }
+
+      const data = await response.json();
+      setUserData(data);
+      if (data.settings) {
+        setOrderUpdates(data.settings.emailNotifications ?? true);
+        setPromoUpdates(data.settings.pushNotifications ?? false);
+      }
+      if (data.roles?.includes('seller')) {
+        setIsSeller(true);
+      }
+    } catch (error) {
+      console.error('Error fetching profile:', error);
+      Alert.alert('Error', 'Failed to load profile');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useFocusEffect(
+    React.useCallback(() => {
+      fetchUserProfile();
+    }, [])
+  );
+
   const handleEditProfile = () => {
+    if (!userData) return;
     router.push({
       pathname: '/(buyer)/edit-profile',
       params: {
-        name: USER_DATA.name,
-        email: USER_DATA.email,
-        phone: USER_DATA.phone,
+        name: userData.name || '',
+        email: userData.email || '',
+        phone: userData.phone || '',
       },
     });
   };
@@ -149,64 +186,70 @@ export default function SettingsScreen() {
         contentContainerStyle={{ padding: 16, paddingBottom: 40 }}
         showsVerticalScrollIndicator={false}
       >
-        {/* Profile Overview */}
-        <View className="items-center mb-6 mt-4">
-          {USER_DATA.avatar ? (
-            <Image
-              source={{ uri: USER_DATA.avatar }}
-              style={{
-                width: 110,
-                height: 110,
-                borderRadius: 55,
-                marginBottom: 16,
-                borderWidth: 3,
-                borderColor: '#2C4A34',
-              }}
-              resizeMode="cover"
-            />
-          ) : (
-            <View
-              style={{
-                width: 110,
-                height: 110,
-                borderRadius: 55,
-                backgroundColor: '#E8F3E0',
-                alignItems: 'center',
-                justifyContent: 'center',
-                marginBottom: 16,
-                borderWidth: 3,
-                borderColor: '#2C4A34',
-              }}
-            >
-              <User size={56} stroke="#2C4A34" />
-            </View>
-          )}
-
-          <View className="flex-row items-center mb-1">
-            <Text
-              className="text-2xl font-bold mr-3"
-              style={{ color: '#E8F3E0', fontFamily: 'System' }}
-            >
-              {USER_DATA.name}
-            </Text>
-            <TouchableOpacity onPress={handleEditProfile}>
-              <Pencil size={18} stroke="#E8F3E0" />
-            </TouchableOpacity>
+        {loading ? (
+          <View className="items-center justify-center" style={{ minHeight: 200 }}>
+            <ActivityIndicator size="large" color="#E8F3E0" />
           </View>
+        ) : (
+          <>
+            {/* Profile Overview */}
+            <View className="items-center mb-6 mt-4">
+              {userData?.avatar ? (
+                <Image
+                  source={{ uri: userData.avatar.startsWith('http') ? userData.avatar : `${API_URL}${userData.avatar}` }}
+                  style={{
+                    width: 110,
+                    height: 110,
+                    borderRadius: 55,
+                    marginBottom: 16,
+                    borderWidth: 3,
+                    borderColor: '#2C4A34',
+                  }}
+                  resizeMode="cover"
+                />
+              ) : (
+                <View
+                  style={{
+                    width: 110,
+                    height: 110,
+                    borderRadius: 55,
+                    backgroundColor: '#E8F3E0',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    marginBottom: 16,
+                    borderWidth: 3,
+                    borderColor: '#2C4A34',
+                  }}
+                >
+                  <User size={56} stroke="#2C4A34" />
+                </View>
+              )}
 
-          <Text
-            className="text-sm mb-1"
-            style={{ color: '#E8F3E0', fontFamily: 'System' }}
-          >
-            {USER_DATA.email}
-          </Text>
-          <Text
-            className="text-sm"
-            style={{ color: '#E8F3E0', fontFamily: 'System' }}
-          >
-            {USER_DATA.phone}
-          </Text>
-        </View>
+              <View className="flex-row items-center mb-1">
+                <Text
+                  className="text-2xl font-bold mr-3"
+                  style={{ color: '#E8F3E0', fontFamily: 'System' }}
+                >
+                  {userData?.name || 'User'}
+                </Text>
+                <TouchableOpacity onPress={handleEditProfile}>
+                  <Pencil size={18} stroke="#E8F3E0" />
+                </TouchableOpacity>
+              </View>
+
+              <Text
+                className="text-sm mb-1"
+                style={{ color: '#E8F3E0', fontFamily: 'System' }}
+              >
+                {userData?.email || ''}
+              </Text>
+              <Text
+                className="text-sm"
+                style={{ color: '#E8F3E0', fontFamily: 'System' }}
+              >
+                {userData?.phone || ''}
+              </Text>
+            </View>
 
         {/* Account Section */}
         <View
@@ -562,32 +605,34 @@ export default function SettingsScreen() {
           </Text>
         </View>
 
-        {/* Log Out Button */}
-        <TouchableOpacity
-          onPress={handleLogout}
-          className="py-4 rounded-3xl mb-4"
-          style={{ backgroundColor: '#C85E51', marginTop: 16 }}
-        >
-          <Text
-            className="text-base font-semibold text-center"
-            style={{ color: '#ffffff', fontFamily: 'System' }}
-          >
-            Log Out
-          </Text>
-        </TouchableOpacity>
+            {/* Log Out Button */}
+            <TouchableOpacity
+              onPress={handleLogout}
+              className="py-4 rounded-3xl mb-4"
+              style={{ backgroundColor: '#C85E51', marginTop: 16 }}
+            >
+              <Text
+                className="text-base font-semibold text-center"
+                style={{ color: '#ffffff', fontFamily: 'System' }}
+              >
+                Log Out
+              </Text>
+            </TouchableOpacity>
 
-        {/* Delete Account */}
-        <TouchableOpacity
-          onPress={handleDeleteAccount}
-          className="items-center py-2"
-        >
-          <Text
-            className="text-sm"
-            style={{ color: '#C85E51', fontFamily: 'System' }}
-          >
-            Delete Account
-          </Text>
-        </TouchableOpacity>
+            {/* Delete Account */}
+            <TouchableOpacity
+              onPress={handleDeleteAccount}
+              className="items-center py-2"
+            >
+              <Text
+                className="text-sm"
+                style={{ color: '#C85E51', fontFamily: 'System' }}
+              >
+                Delete Account
+              </Text>
+            </TouchableOpacity>
+          </>
+        )}
       </ScrollView>
     </View>
   );

@@ -1,11 +1,60 @@
-import React from 'react';
-import { View, Text, TouchableOpacity, Image } from 'react-native';
+import React, { useEffect } from 'react';
+import { View, Text, TouchableOpacity, Image, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Package, ShoppingBag } from 'lucide-react-native';
 import '../global.css';
+import { getAuthToken } from '../config/auth';
+import { API_URL } from '../config/api';
 
 export default function RoleSelectionScreen() {
   const router = useRouter();
+  const [loading, setLoading] = React.useState(true);
+
+  useEffect(() => {
+    const checkUserRole = async () => {
+      const token = getAuthToken();
+      if (!token) {
+        router.replace('/login');
+        return;
+      }
+
+      try {
+        const response = await fetch(`${API_URL}/api/user/profile`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
+        if (response.ok) {
+          const user = await response.json();
+          const roles = user.roles || [];
+          // If user already has a role, navigate to their home
+          if (roles.includes('seller')) {
+            router.replace('/(seller)/dashboard');
+          } else if (roles.includes('buyer')) {
+            router.replace('/(buyer)/home');
+          } else {
+            // New user without role, show selection
+            setLoading(false);
+          }
+        } else {
+          router.replace('/login');
+        }
+      } catch (error) {
+        router.replace('/login');
+      }
+    };
+
+    checkUserRole();
+  }, []);
+
+  if (loading) {
+    return (
+      <View className="flex-1 items-center justify-center" style={{ backgroundColor: '#365441' }}>
+        <ActivityIndicator size="large" color="#E8F3E0" />
+      </View>
+    );
+  }
 
   return (
     <View className="flex-1" style={{ backgroundColor: '#365441' }}>

@@ -1,17 +1,11 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { View, Text, TouchableOpacity, FlatList, TextInput, KeyboardAvoidingView, Platform, StatusBar } from 'react-native';
+import { View, Text, TouchableOpacity, FlatList, TextInput, KeyboardAvoidingView, Platform, StatusBar, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { ArrowLeft, Send, Bot } from 'lucide-react-native';
 import '../../global.css';
-
-// TODO: Replace with API call
-const SAMPLE_RESPONSES = [
-  "Great question! For Kangkung, make sure to keep the soil consistently moist and provide partial shade during the hottest part of the day.",
-  "Pandan leaves grow best in well-drained soil with high organic matter. They prefer partial shade and can be harvested year-round.",
-  "For Durian trees, ensure they have plenty of space (at least 10 meters apart) and deep, well-drained soil. They typically take 5-10 years to bear fruit.",
-  "Rambutan trees need regular watering, especially during dry periods. They prefer slightly acidic soil with good drainage.",
-];
+import { API_URL } from '../../config/api';
+import { getAuthToken } from '../../config/auth';
 
 export default function AIChatbotScreen() {
   const router = useRouter();
@@ -19,15 +13,16 @@ export default function AIChatbotScreen() {
     {
       id: '1',
       sender: 'bot',
-      content: 'Hello! I\'m your AI Plant Assistant. Ask me anything about growing plants, tips, and tricks!',
+      content: 'Hello! I\'m your AI Plant Assistant powered by Llama 3.1. Ask me anything about growing plants, sustainable food practices, tips, and tricks!',
       timestamp: 'Now',
     },
   ]);
   const [input, setInput] = useState('');
+  const [loading, setLoading] = useState(false);
   const flatListRef = useRef<FlatList>(null);
 
-  const sendMessage = (text: string) => {
-    if (!text.trim()) return;
+  const sendMessage = async (text: string) => {
+    if (!text.trim() || loading) return;
 
     // Add user message
     const userMessage = {
@@ -38,18 +33,47 @@ export default function AIChatbotScreen() {
     };
     setMessages((prev) => [...prev, userMessage]);
     setInput('');
+    setLoading(true);
 
-    // Simulate bot response after a short delay
-    setTimeout(() => {
-      const randomResponse = SAMPLE_RESPONSES[Math.floor(Math.random() * SAMPLE_RESPONSES.length)];
+    try {
+      const token = getAuthToken();
+      if (!token) {
+        throw new Error('Not authenticated');
+      }
+
+      const response = await fetch(`${API_URL}/api/ai/chat`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ message: text }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data?.error || 'Failed to get AI response');
+      }
+
       const botMessage = {
         id: `${Date.now() + 1}`,
         sender: 'bot',
-        content: randomResponse,
+        content: data.response || 'I apologize, but I could not generate a response. Please try again.',
         timestamp: 'Now',
       };
       setMessages((prev) => [...prev, botMessage]);
-    }, 1000);
+    } catch (error: any) {
+      const errorMessage = {
+        id: `${Date.now() + 1}`,
+        sender: 'bot',
+        content: 'Sorry, I\'m having trouble connecting right now. Please try again later.',
+        timestamp: 'Now',
+      };
+      setMessages((prev) => [...prev, errorMessage]);
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => {
@@ -195,10 +219,16 @@ export default function AIChatbotScreen() {
               minWidth: 70,
               alignItems: 'center',
               justifyContent: 'center',
+              opacity: loading ? 0.7 : 1,
             }}
             onPress={() => sendMessage(input)}
+            disabled={loading || !input.trim()}
           >
-            <Send size={20} stroke="#ffffff" />
+            {loading ? (
+              <ActivityIndicator color="#ffffff" size="small" />
+            ) : (
+              <Send size={20} stroke="#ffffff" />
+            )}
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>

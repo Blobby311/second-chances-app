@@ -56,31 +56,10 @@ export default function EditProfileScreen() {
       </View>
 
       <View className="flex-1 px-4 pt-8">
-        {/* Profile Picture */}
-        <View className="items-center mb-8">
-          <Image
-            source={{ uri: INITIAL_USER_DATA.avatar }}
-            style={{ 
-              width: 100, 
-              height: 100, 
-              borderRadius: 50, 
-              marginBottom: 12,
-              borderWidth: 3,
-              borderColor: '#2C4A34',
-            }}
-            resizeMode="cover"
-          />
-          <TouchableOpacity>
-            <Text className="text-base font-semibold" style={{ color: '#E8F3E0', fontFamily: 'System' }}>
-              Change Photo
-            </Text>
-          </TouchableOpacity>
-        </View>
-
         {/* Name Input */}
         <View className="mb-4">
           <Text className="text-sm font-semibold mb-2" style={{ color: '#E8F3E0', fontFamily: 'System' }}>
-            Username
+            Name
           </Text>
           <TextInput
             className="px-4 py-3 rounded-2xl"
@@ -92,31 +71,16 @@ export default function EditProfileScreen() {
           />
         </View>
 
-        {/* Full Name Input */}
+        {/* Email Input - Read Only */}
         <View className="mb-4">
           <Text className="text-sm font-semibold mb-2" style={{ color: '#E8F3E0', fontFamily: 'System' }}>
-            Full Name
+            Email (cannot be changed)
           </Text>
           <TextInput
             className="px-4 py-3 rounded-2xl"
-            style={{ backgroundColor: '#E8F3E0', color: '#2C4A34', fontFamily: 'System' }}
-            value={fullName}
-            onChangeText={setFullName}
-            placeholder="Enter your full name"
-            placeholderTextColor="#6b7280"
-          />
-        </View>
-
-        {/* Email Input */}
-        <View className="mb-4">
-          <Text className="text-sm font-semibold mb-2" style={{ color: '#E8F3E0', fontFamily: 'System' }}>
-            Email
-          </Text>
-          <TextInput
-            className="px-4 py-3 rounded-2xl"
-            style={{ backgroundColor: '#E8F3E0', color: '#2C4A34', fontFamily: 'System' }}
+            style={{ backgroundColor: '#E8F3E0', color: '#6b7280', fontFamily: 'System' }}
             value={email}
-            onChangeText={setEmail}
+            editable={false}
             placeholder="Enter your email"
             placeholderTextColor="#6b7280"
             keyboardType="email-address"
@@ -144,11 +108,16 @@ export default function EditProfileScreen() {
         <TouchableOpacity
           onPress={handleSave}
           className="py-4 rounded-3xl mb-4"
-          style={{ backgroundColor: '#C85E51' }}
+          style={{ backgroundColor: '#C85E51', opacity: loading ? 0.7 : 1 }}
+          disabled={loading}
         >
-          <Text className="text-base font-semibold text-center" style={{ color: '#ffffff', fontFamily: 'System' }}>
-            Save
-          </Text>
+          {loading ? (
+            <ActivityIndicator color="#ffffff" />
+          ) : (
+            <Text className="text-base font-semibold text-center" style={{ color: '#ffffff', fontFamily: 'System' }}>
+              Save
+            </Text>
+          )}
         </TouchableOpacity>
 
         {/* Cancel Button */}

@@ -17,8 +17,27 @@ export default function LoginScreen() {
   const [error, setError] = useState('');
 
   const handleLogin = async () => {
-    if (!email || !password) {
-      setError('Email and password are required');
+    // Clear previous errors
+    setError('');
+
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!email || !email.trim()) {
+      setError('Email is required');
+      return;
+    }
+    if (!emailRegex.test(email.trim())) {
+      setError('Please enter a valid email address');
+      return;
+    }
+
+    // Validate password
+    if (!password || password.length === 0) {
+      setError('Password is required');
+      return;
+    }
+    if (password.length < 6) {
+      setError('Password must be at least 6 characters');
       return;
     }
 
@@ -31,7 +50,7 @@ export default function LoginScreen() {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ email: email.trim(), password }),
       });
 
       const data = await response.json();
@@ -42,8 +61,21 @@ export default function LoginScreen() {
         return;
       }
 
+      // Validate that we got a token and user data
+      if (!data.token || !data.user) {
+        setError('Invalid response from server');
+        return;
+      }
+
       await setAuthToken(data.token);
-      router.push('/role-selection');
+      
+      // Navigate based on user role
+      const userRoles = data.user.roles || [];
+      if (userRoles.includes('seller')) {
+        router.replace('/(seller)/dashboard');
+      } else {
+        router.replace('/(buyer)/home');
+      }
     } catch (err) {
       setError('Unable to reach server. Please try again.');
     } finally {
