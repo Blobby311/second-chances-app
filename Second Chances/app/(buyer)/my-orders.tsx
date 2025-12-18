@@ -1,90 +1,122 @@
-import React, { useState, useMemo } from 'react';
-import { View, Text, TouchableOpacity, FlatList, StatusBar, Image, Alert } from 'react-native';
-import { useRouter } from 'expo-router';
+import React, { useState, useMemo, useEffect } from 'react';
+import { View, Text, TouchableOpacity, FlatList, StatusBar, Image, Alert, ActivityIndicator } from 'react-native';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { Menu, Star, Package } from 'lucide-react-native';
 import '../../global.css';
-
-// TODO: Replace with API call
-const ORDERS_DATA = {
-  'To Receive': [
-    {
-      id: '1',
-      productName: 'Rescued Veggie Box',
-      sellerId: 's1',
-      sellerName: 'Uncle Roger',
-      orderId: '#XM12345',
-      deliveryMethod: 'Self Pick Up @ Farm',
-      total: 'RM10',
-      status: 'Ready for Pickup',
-      imageUrl: 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQRQEytqdym2soe7nH5Tqqe4X1GvyNbDbUs0A&s',
-      canRate: false,
-    },
-    {
-      id: '2',
-      productName: 'Sunrise Fruit Crate',
-      sellerId: 's1',
-      sellerName: 'Uncle Roger',
-      orderId: '#YM67890',
-      deliveryMethod: 'Doorstep Delivery',
-      total: 'RM15',
-      status: 'On the Way',
-      imageUrl: 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRSimGyJxyM2BpGcrcv9_b_lskXGFHA_TPoOw&s',
-      canRate: false,
-    },
-  ],
-  'Completed': [
-    {
-      id: '3',
-      productName: 'Organic Veg Rescue',
-      sellerId: 's1',
-      sellerName: 'Uncle Roger',
-      orderId: '#ZN11223',
-      deliveryMethod: 'Self Pick Up',
-      total: 'RM12',
-      status: 'Delivered',
-      imageUrl: 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcS0NTZmv6zIanNf621NF_dJQNoCb4eYQNAAzQ&s',
-      canRate: true,
-      rated: false,
-    },
-    {
-      id: '4',
-      productName: 'Neighbor\'s Free Gift',
-      sellerId: 's1',
-      sellerName: 'Uncle Roger',
-      orderId: '#XM12346',
-      deliveryMethod: 'Self Pick Up @ Farm',
-      total: 'RM0',
-      status: 'Completed',
-      imageUrl: 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTmAps3JJfGUb6r7bvZZL6zHjAzgxvMvD2Ijg&s',
-      canRate: true,
-      rated: true,
-    },
-  ],
-  'Cancelled': [
-    {
-      id: '5',
-      productName: 'Mixed Veggie Box',
-      sellerId: 's1',
-      sellerName: 'Uncle Roger',
-      orderId: '#YM67892',
-      deliveryMethod: 'Doorstep Delivery',
-      total: 'RM10',
-      status: 'Cancelled',
-      imageUrl: 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRSimGyJxyM2BpGcrcv9_b_lskXGFHA_TPoOw&s',
-      canRate: false,
-    },
-  ],
-};
+import { API_URL } from '../../config/api';
+import { getAuthToken } from '../../config/auth';
 
 const TABS = ['To Receive', 'Completed', 'Cancelled'];
+
+interface OrderItem {
+  id: string;
+  productName: string;
+  sellerId: string;
+  sellerName: string;
+  orderId: string;
+  deliveryMethod: string;
+  total: string;
+  status: string;
+  imageUrl: string;
+  canRate: boolean;
+  rated?: boolean;
+}
 
 export default function MyOrdersScreen() {
   const router = useRouter();
   const [selectedTab, setSelectedTab] = useState('To Receive');
+  const [orders, setOrders] = useState<OrderItem[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  // Fetch orders from API
+  const fetchOrders = async () => {
+    try {
+      setLoading(true);
+      const token = getAuthToken();
+      if (!token) {
+        setLoading(false);
+        return;
+      }
+
+      // Map frontend tab to backend status
+      let status: string | undefined;
+      if (selectedTab === 'To Receive') {
+        status = 'to-receive';
+      } else if (selectedTab === 'Completed') {
+        status = 'completed';
+      } else if (selectedTab === 'Cancelled') {
+        status = 'cancelled';
+      }
+
+      const url = status 
+        ? `${API_URL}/api/orders/buyer/orders?status=${status}`
+        : `${API_URL}/api/orders/buyer/orders`;
+
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch orders');
+      }
+
+      const data = await response.json();
+
+      // Transform backend data to frontend format
+      const formattedOrders: OrderItem[] = data.map((order: any) => {
+        const product = order.product || {};
+        const seller = order.seller || {};
+        
+        // Map backend status to display status
+        let displayStatus = order.status;
+        if (order.status === 'ready-for-pickup') displayStatus = 'Ready for Pickup';
+        else if (order.status === 'on-the-way') displayStatus = 'On the Way';
+        else if (order.status === 'delivered') displayStatus = 'Delivered';
+        else if (order.status === 'pending') displayStatus = 'Pending';
+        
+        return {
+          id: order._id || order.id,
+          productName: product.name || 'Unknown Product',
+          sellerId: order.seller?._id || order.seller || '',
+          sellerName: seller.name || 'Unknown Seller',
+          orderId: order.orderId || '#UNKNOWN',
+          deliveryMethod: order.deliveryMethod || 'Not specified',
+          total: order.total === 0 ? 'RM0' : `RM${order.total.toFixed(2)}`,
+          status: displayStatus,
+          imageUrl: product.imageUrl || 'https://via.placeholder.com/400',
+          canRate: order.status === 'completed' || order.status === 'delivered',
+          rated: false, // TODO: Check if order has been rated
+        };
+      });
+
+      setOrders(formattedOrders);
+    } catch (error: any) {
+      console.error('Error fetching orders:', error);
+      Alert.alert('Error', 'Failed to load orders. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Fetch orders when tab changes
+  useEffect(() => {
+    fetchOrders();
+  }, [selectedTab]);
+
+  // Refetch when screen comes into focus
+  useFocusEffect(
+    React.useCallback(() => {
+      fetchOrders();
+    }, [selectedTab])
+  );
 
   const filteredData = useMemo(() => {
-    return ORDERS_DATA[selectedTab as keyof typeof ORDERS_DATA] || [];
-  }, [selectedTab]);
+    return orders;
+  }, [orders]);
 
   const handleRateSeller = (orderId: string, sellerId: string) => {
     router.push({
@@ -97,7 +129,7 @@ export default function MyOrdersScreen() {
     router.push(`/chat/${sellerId}`);
   };
 
-  const renderOrderItem = ({ item }: { item: typeof ORDERS_DATA['To Receive'][0] }) => (
+  const renderOrderItem = ({ item }: { item: OrderItem }) => (
     <TouchableOpacity
       onPress={() => router.push(`/(buyer)/order-detail/${item.id}`)}
       className="p-4 rounded-3xl mb-4"
@@ -246,20 +278,26 @@ export default function MyOrdersScreen() {
       </View>
 
       {/* Orders List */}
-      <FlatList
-        data={filteredData}
-        renderItem={renderOrderItem}
-        keyExtractor={(item) => item.id}
-        contentContainerStyle={{ padding: 16, paddingBottom: 20 }}
-        ListEmptyComponent={
-          <View className="items-center mt-12">
-            <Package size={48} stroke="#E8F3E0" />
-            <Text className="text-base mt-4" style={{ color: '#E8F3E0', fontFamily: 'System' }}>
-              No orders in this category
-            </Text>
-          </View>
-        }
-      />
+      {loading ? (
+        <View className="flex-1 items-center justify-center">
+          <ActivityIndicator size="large" color="#E8F3E0" />
+        </View>
+      ) : (
+        <FlatList
+          data={filteredData}
+          renderItem={renderOrderItem}
+          keyExtractor={(item) => item.id}
+          contentContainerStyle={{ padding: 16, paddingBottom: 20 }}
+          ListEmptyComponent={
+            <View className="items-center mt-12">
+              <Package size={48} stroke="#E8F3E0" />
+              <Text className="text-base mt-4" style={{ color: '#E8F3E0', fontFamily: 'System' }}>
+                No orders in this category
+              </Text>
+            </View>
+          }
+        />
+      )}
     </View>
   );
 }

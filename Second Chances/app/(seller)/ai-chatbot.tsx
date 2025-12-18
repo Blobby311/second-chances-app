@@ -9,27 +9,99 @@ import { getAuthToken } from '../../config/auth';
 
 export default function AIChatbotScreen() {
   const router = useRouter();
-  const [messages, setMessages] = useState([
-    {
-      id: '1',
-      sender: 'bot',
-      content: 'Hello! I\'m your AI Plant Assistant powered by Llama 3.1. Ask me anything about growing plants, sustainable food practices, tips, and tricks!',
-      timestamp: 'Now',
-    },
-  ]);
+  const [messages, setMessages] = useState<Array<{ id: string; sender: 'user' | 'bot'; content: string; timestamp: string }>>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
+  const [loadingHistory, setLoadingHistory] = useState(true);
   const flatListRef = useRef<FlatList>(null);
+
+  // Load chat history on mount
+  useEffect(() => {
+    const loadChatHistory = async () => {
+      try {
+        const token = getAuthToken();
+        if (!token) {
+          // If not authenticated, show welcome message
+          setMessages([{
+            id: '1',
+            sender: 'bot',
+            content: 'Hello! I\'m your AI Plant Assistant powered by GPT OSS 120B. Ask me anything about growing plants, sustainable food practices, tips, and tricks!',
+            timestamp: 'Now',
+          }]);
+          setLoadingHistory(false);
+          return;
+        }
+
+        const response = await fetch(`${API_URL}/api/ai/chat/history`, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
+        const data = await response.json();
+
+        if (response.ok && Array.isArray(data) && data.length > 0) {
+          // Load existing messages
+          const formattedMessages = data.map((msg: any) => ({
+            id: msg.id,
+            sender: msg.sender,
+            content: msg.content,
+            timestamp: formatTimestamp(msg.timestamp),
+          }));
+          setMessages(formattedMessages);
+        } else {
+          // No history, show welcome message
+          setMessages([{
+            id: '1',
+            sender: 'bot',
+            content: 'Hello! I\'m your AI Plant Assistant powered by GPT OSS 120B. Ask me anything about growing plants, sustainable food practices, tips, and tricks!',
+            timestamp: 'Now',
+          }]);
+        }
+      } catch (error) {
+        console.error('Error loading chat history:', error);
+        // Show welcome message on error
+        setMessages([{
+          id: '1',
+          sender: 'bot',
+          content: 'Hello! I\'m your AI Plant Assistant powered by GPT OSS 120B. Ask me anything about growing plants, sustainable food practices, tips, and tricks!',
+          timestamp: 'Now',
+        }]);
+      } finally {
+        setLoadingHistory(false);
+      }
+    };
+
+    loadChatHistory();
+  }, []);
+
+  const formatTimestamp = (timestamp: string | Date): string => {
+    if (!timestamp) return 'Now';
+    const date = new Date(timestamp);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    
+    if (diffMins < 1) return 'Just now';
+    if (diffMins < 60) return `${diffMins}m ago`;
+    const diffHours = Math.floor(diffMins / 60);
+    if (diffHours < 24) return `${diffHours}h ago`;
+    const diffDays = Math.floor(diffHours / 24);
+    if (diffDays < 7) return `${diffDays}d ago`;
+    return date.toLocaleDateString();
+  };
 
   const sendMessage = async (text: string) => {
     if (!text.trim() || loading) return;
 
-    // Add user message
+    // Add user message optimistically
     const userMessage = {
-      id: `${Date.now()}`,
-      sender: 'user',
+      id: `temp-${Date.now()}`,
+      sender: 'user' as const,
       content: text,
-      timestamp: 'Now',
+      timestamp: 'Just now',
     };
     setMessages((prev) => [...prev, userMessage]);
     setInput('');
@@ -56,19 +128,47 @@ export default function AIChatbotScreen() {
         throw new Error(data?.error || 'Failed to get AI response');
       }
 
+      // The backend now saves messages, so we reload from server to get real IDs
+      // But for immediate UI update, we'll add the bot message optimistically
       const botMessage = {
-        id: `${Date.now() + 1}`,
-        sender: 'bot',
+        id: `temp-bot-${Date.now()}`,
+        sender: 'bot' as const,
         content: data.response || 'I apologize, but I could not generate a response. Please try again.',
-        timestamp: 'Now',
+        timestamp: 'Just now',
       };
       setMessages((prev) => [...prev, botMessage]);
+
+      // Reload history to get real IDs and ensure consistency
+      // But do it in background to not block UI
+      setTimeout(async () => {
+        try {
+          const historyResponse = await fetch(`${API_URL}/api/ai/chat/history`, {
+            method: 'GET',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${token}`,
+            },
+          });
+          const historyData = await historyResponse.json();
+          if (historyResponse.ok && Array.isArray(historyData)) {
+            const formattedMessages = historyData.map((msg: any) => ({
+              id: msg.id,
+              sender: msg.sender,
+              content: msg.content,
+              timestamp: formatTimestamp(msg.timestamp),
+            }));
+            setMessages(formattedMessages);
+          }
+        } catch (e) {
+          // Silent fail - we already have the messages displayed
+        }
+      }, 500);
     } catch (error: any) {
       const errorMessage = {
-        id: `${Date.now() + 1}`,
-        sender: 'bot',
+        id: `temp-error-${Date.now()}`,
+        sender: 'bot' as const,
         content: 'Sorry, I\'m having trouble connecting right now. Please try again later.',
-        timestamp: 'Now',
+        timestamp: 'Just now',
       };
       setMessages((prev) => [...prev, errorMessage]);
     } finally {
@@ -170,14 +270,20 @@ export default function AIChatbotScreen() {
         keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
       >
         {/* Messages List */}
-        <FlatList
-          ref={flatListRef}
-          data={messages}
-          keyExtractor={(item) => item.id}
-          renderItem={renderMessage}
-          contentContainerStyle={{ padding: 16, paddingBottom: 12 }}
-          keyboardShouldPersistTaps="handled"
-        />
+        {loadingHistory ? (
+          <View className="flex-1 items-center justify-center">
+            <ActivityIndicator size="large" color="#E8F3E0" />
+          </View>
+        ) : (
+          <FlatList
+            ref={flatListRef}
+            data={messages}
+            keyExtractor={(item) => item.id}
+            renderItem={renderMessage}
+            contentContainerStyle={{ padding: 16, paddingBottom: 12 }}
+            keyboardShouldPersistTaps="handled"
+          />
+        )}
 
         {/* Input - Fixed at bottom */}
         <View
