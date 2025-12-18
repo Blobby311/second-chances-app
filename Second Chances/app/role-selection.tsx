@@ -38,7 +38,7 @@ export default function RoleSelectionScreen() {
             {/* Seller Card */}
             <TouchableOpacity 
             onPress={() => {
-              router.replace('/(seller)/dashboard');
+              router.push({ pathname: '/register', params: { role: 'seller' } });
             }}
             className="items-center justify-center"
                     style={{ 
@@ -62,7 +62,7 @@ export default function RoleSelectionScreen() {
             {/* Buyer Card */}
             <TouchableOpacity 
             onPress={() => {
-              router.replace('/(buyer)/home');
+              router.push({ pathname: '/register', params: { role: 'buyer' } });
             }}
             className="items-center justify-center"
                     style={{ 

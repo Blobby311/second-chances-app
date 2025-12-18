@@ -3,6 +3,8 @@ import { View, Text, TouchableOpacity, ScrollView, StatusBar, Switch, Alert, Ima
 import { useRouter } from 'expo-router';
 import { ArrowLeft, Pencil, ChevronRight, User } from 'lucide-react-native';
 import '../../global.css';
+import { API_URL } from '../../config/api';
+import { getAuthToken, clearAuthToken } from '../../config/auth';
 
 // TODO: Replace with API call
 const USER_DATA = {
@@ -54,10 +56,23 @@ export default function SettingsScreen() {
         {
           text: 'Log Out',
           style: 'destructive',
-          onPress: () => {
-            // TODO: Call logout API and clear session
-            console.log('Logout');
-            router.replace('/login');
+          onPress: async () => {
+            try {
+              const token = getAuthToken();
+              if (token) {
+                await fetch(`${API_URL}/api/auth/logout`, {
+                  method: 'POST',
+                  headers: {
+                    Authorization: `Bearer ${token}`,
+                  },
+                });
+              }
+            } catch {
+              // ignore, still clear locally
+            } finally {
+              await clearAuthToken();
+              router.replace('/login');
+            }
           },
         },
       ]
@@ -76,9 +91,37 @@ export default function SettingsScreen() {
         {
           text: 'Delete',
           style: 'destructive',
-          onPress: () => {
-            // TODO: Call delete account API
-            console.log('Delete account');
+          onPress: async () => {
+            try {
+              const token = getAuthToken();
+              if (!token) {
+                Alert.alert('Error', 'You need to be logged in to delete your account.');
+                return;
+              }
+
+              const response = await fetch(`${API_URL}/api/user/account`, {
+                method: 'DELETE',
+                headers: {
+                  Authorization: `Bearer ${token}`,
+                },
+              });
+
+              if (!response.ok) {
+                const data = await response.json();
+                Alert.alert('Error', data?.error || 'Failed to delete account.');
+                return;
+              }
+
+              await clearAuthToken();
+              Alert.alert('Account deleted', 'Your account has been deleted.', [
+                {
+                  text: 'OK',
+                  onPress: () => router.replace('/login'),
+                },
+              ]);
+            } catch {
+              Alert.alert('Error', 'Unable to delete account. Please try again.');
+            }
           },
         },
       ]

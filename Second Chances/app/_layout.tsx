@@ -25,7 +25,6 @@ export default function RootLayout() {
       />
       <Stack.Screen name="product/[id]" />
       <Stack.Screen name="seller-profile/[id]" />
-      <Stack.Screen name="buyer-profile/[id]" />
       <Stack.Screen name="checkout" />
       <Stack.Screen name="rating/[orderId]" />
     </Stack>

@@ -1,68 +1,11 @@
-import React, { useState, useMemo, useRef } from 'react';
-import { View, Text, TextInput, TouchableOpacity, FlatList, StatusBar, ImageBackground, PanResponder, Dimensions, BackHandler } from 'react-native';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
+import { View, Text, TextInput, TouchableOpacity, FlatList, StatusBar, ImageBackground, PanResponder, Dimensions, BackHandler, ActivityIndicator } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { Menu, Search, ShieldCheck, MapPin, Heart } from 'lucide-react-native';
 import '../../global.css';
+import { API_URL } from '../../config/api';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
-
-// TODO: Replace with API call - This should sync with seller's stock "Available" items
-const PRODUCT_DATA = [
-  {
-    id: '1',
-    title: 'Rescued Veggie Box',
-    price: 'RM10',
-    distance: '2.4 km',
-    isFree: false,
-    isVerified: true,
-    imageUrl: 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQRQEytqdym2soe7nH5Tqqe4X1GvyNbDbUs0A&s',
-  },
-  {
-    id: '2',
-    title: 'Sunrise Fruit Crate',
-    price: 'RM15',
-    distance: '1.2 km',
-    isFree: false,
-    isVerified: true,
-    imageUrl: 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRSimGyJxyM2BpGcrcv9_b_lskXGFHA_TPoOw&s',
-  },
-  {
-    id: '3',
-    title: 'Organic Veg Rescue',
-    price: 'RM12',
-    distance: '3.1 km',
-    isFree: false,
-    isVerified: true,
-    imageUrl: 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcS0NTZmv6zIanNf621NF_dJQNoCb4eYQNAAzQ&s',
-  },
-  {
-    id: '4',
-    title: 'Neighbor\'s Free Gift',
-    price: 'RM0',
-    distance: '4.5 km',
-    isFree: true,
-    isVerified: true,
-    imageUrl: 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTmAps3JJfGUb6r7bvZZL6zHjAzgxvMvD2Ijg&s',
-  },
-  {
-    id: '5',
-    title: 'Fresh Fruit Basket',
-    price: 'RM18',
-    distance: '2.8 km',
-    isFree: false,
-    isVerified: true,
-    imageUrl: 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQRQEytqdym2soe7nH5Tqqe4X1GvyNbDbUs0A&s',
-  },
-  {
-    id: '6',
-    title: 'Mixed Veggie Box',
-    price: 'RM10',
-    distance: '1.9 km',
-    isFree: false,
-    isVerified: false,
-    imageUrl: 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRSimGyJxyM2BpGcrcv9_b_lskXGFHA_TPoOw&s',
-  },
-];
 
 const FILTERS = ['All', 'Free Gifts', 'Veg', 'Fruit'];
 
@@ -70,6 +13,9 @@ export default function BuyerHomeScreen() {
   const router = useRouter();
   const [searchQuery, setSearchQuery] = useState('');
   const [activeFilter, setActiveFilter] = useState('All');
+  const [products, setProducts] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   // TODO: Replace with API call to get user's favorited items
   const [favoritedIds, setFavoritedIds] = useState<string[]>(['1', '2', '3']); // Default favorites
 
@@ -113,25 +59,66 @@ export default function BuyerHomeScreen() {
     })
   ).current;
 
-  const filteredData = useMemo(() => {
-    return PRODUCT_DATA.filter((item) => {
-      const matchesSearch = item.title.toLowerCase().includes(searchQuery.toLowerCase());
-      let matchesFilter = true;
+  useEffect(() => {
+    const controller = new AbortController();
 
-      if (activeFilter === 'Free Gifts') {
-        matchesFilter = item.isFree;
-      } else if (activeFilter === 'Veg') {
-        matchesFilter = item.title.toLowerCase().includes('veg');
-      } else if (activeFilter === 'Fruit') {
-        matchesFilter = item.title.toLowerCase().includes('fruit');
+    const fetchProducts = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+
+        const params = new URLSearchParams();
+
+        if (activeFilter === 'Free Gifts') {
+          params.append('filter', 'free');
+        } else if (activeFilter === 'Veg') {
+          params.append('filter', 'veg');
+        } else if (activeFilter === 'Fruit') {
+          params.append('filter', 'fruit');
+        }
+
+        if (searchQuery) {
+          params.append('search', searchQuery);
+        }
+
+        const url =
+          params.toString().length > 0
+            ? `${API_URL}/api/products?${params.toString()}`
+            : `${API_URL}/api/products`;
+
+        const response = await fetch(url, { signal: controller.signal });
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data?.error || 'Failed to load products');
+        }
+
+        setProducts(data);
+      } catch (err: any) {
+        if (err.name !== 'AbortError') {
+          setError('Unable to load products. Please try again.');
+        }
+      } finally {
+        setLoading(false);
       }
+    };
 
-      return matchesSearch && matchesFilter;
-    });
-  }, [searchQuery, activeFilter]);
+    fetchProducts();
 
-  const renderProductCard = ({ item }: { item: typeof PRODUCT_DATA[0] }) => {
-    const isFavorited = favoritedIds.includes(item.id);
+    return () => controller.abort();
+  }, [activeFilter, searchQuery]);
+
+  const filteredData = useMemo(() => products, [products]);
+
+  const renderProductCard = ({ item }: { item: any }) => {
+    const id = item._id || item.id;
+    const isFree = item.price === 0;
+    const isFavorited = favoritedIds.includes(id);
+    const imageUri = item.imageUrl
+      ? item.imageUrl.startsWith('http')
+        ? item.imageUrl
+        : `${API_URL}${item.imageUrl}`
+      : undefined;
     
     return (
     <View className="flex-1 mb-4" style={{ marginHorizontal: 4, position: 'relative' }}>
@@ -179,7 +166,7 @@ export default function BuyerHomeScreen() {
             <TouchableOpacity
               onPress={(e) => {
                 e.stopPropagation();
-                toggleFavorite(item.id);
+                toggleFavorite(id);
               }}
               style={{
                 width: 36,
@@ -202,16 +189,16 @@ export default function BuyerHomeScreen() {
 
         <View className="p-4">
           <Text className="text-base font-semibold mb-1" style={{ color: '#2C4A34', fontFamily: 'System' }}>
-            {item.title}
+            {item.name}
           </Text>
           <View className="flex-row items-center mb-2">
             <MapPin size={14} stroke="#6b7280" />
             <Text className="text-xs ml-1" style={{ color: '#6b7280', fontFamily: 'System' }}>
-              {item.distance} away
+              Nearby
             </Text>
           </View>
-          <Text className="text-lg font-bold" style={{ color: item.isFree ? '#C85E51' : '#2C4A34', fontFamily: 'System' }}>
-            {item.isFree ? 'Community Gift' : item.price}
+          <Text className="text-lg font-bold" style={{ color: isFree ? '#C85E51' : '#2C4A34', fontFamily: 'System' }}>
+            {isFree ? 'Community Gift' : `RM${item.price}`}
           </Text>
         </View>
       </TouchableOpacity>

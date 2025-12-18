@@ -4,7 +4,8 @@ import { Link, useRouter } from 'expo-router';
 import { User, Eye, EyeOff } from 'lucide-react-native';
 import { FontAwesome5, MaterialIcons } from '@expo/vector-icons';
 import '../global.css';
-import { API_URL } from './config/api';
+import { API_URL } from '../config/api';
+import { setAuthToken } from '../config/auth';
 
 export default function LoginScreen() {
   const router = useRouter();
@@ -41,7 +42,7 @@ export default function LoginScreen() {
         return;
       }
 
-      // TODO: Persist token/rememberMe once storage is decided
+      await setAuthToken(data.token);
       router.push('/role-selection');
     } catch (err) {
       setError('Unable to reach server. Please try again.');
