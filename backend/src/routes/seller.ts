@@ -8,7 +8,9 @@ import Notification from '../models/Notification';
 
 const router = express.Router();
 
-// Get seller stock
+// Get seller stock (products)
+// NOTE: Products are tied to the seller who created them via { seller: userId }
+// Buyer and seller data are completely separate - switching roles does NOT mix data
 router.get(
   '/stock',
   authenticate,
@@ -17,6 +19,7 @@ router.get(
   async (req: AuthRequest, res: Response) => {
     try {
       const { status } = req.query;
+      // Only return products created by this seller - buyer browsing sees different products
       const query: any = { seller: req.userId };
       if (status) {
         query.status = status;
@@ -31,6 +34,11 @@ router.get(
 );
 
 // Get seller orders
+// NOTE: Buyer and seller data are completely separate:
+// - Seller orders: filtered by { seller: userId } - only shows orders where user is the seller
+// - Buyer orders: filtered by { buyer: userId } - only shows orders where user is the buyer
+// - Products: filtered by { seller: userId } - only shows products created by the seller
+// Switching roles does NOT mix or merge data - each role has its own separate data
 router.get(
   '/orders',
   authenticate,
@@ -39,6 +47,7 @@ router.get(
   async (req: AuthRequest, res: Response) => {
     try {
       const { status } = req.query;
+      // Only return orders where this user is the seller - buyer data is separate
       const query: any = { seller: req.userId };
       if (status) {
         query.status = status;

@@ -1,121 +1,72 @@
-import React, { useState, useRef } from 'react';
-import { View, Text, TouchableOpacity, FlatList, StatusBar, Image, TextInput, Animated, PanResponder, Dimensions, Alert } from 'react-native';
-import { useRouter, useLocalSearchParams } from 'expo-router';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
+import { View, Text, TouchableOpacity, FlatList, StatusBar, Image, TextInput, Animated, PanResponder, Dimensions, Alert, ActivityIndicator } from 'react-native';
+import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { Menu, Search, Trash2, Leaf, MessageCircle } from 'lucide-react-native';
 import '../../global.css';
+import { API_URL } from '../../config/api';
+import { getAuthToken } from '../../config/auth';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const SWIPE_THRESHOLD = 100;
 const DELETE_BUTTON_WIDTH = 80;
 
-// TODO: Replace with API call
-// Buyer data matching the chat/[id].tsx file
-const BUYER_DATA = [
+// Sample chats for testing/fallback
+const SAMPLE_BUYER_CHATS: ChatItem[] = [
   {
-    id: 'b1',
-    name: 'Ahmad bin Abdullah',
-    avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=400&q=60',
-  },
-  {
-    id: 'b2',
-    name: 'Siti Nurhaliza binti Ahmad',
-    avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=400&q=60',
-  },
-  {
-    id: 'b3',
-    name: 'Lim Wei Ming',
-    avatar: 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&w=400&q=60',
-  },
-  {
-    id: 'b4',
-    name: 'Raj Kumar a/l Muthu',
-    avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&w=400&q=60',
-  },
-];
-
-// Seller data for buyer-side chats
-const SELLER_DATA = [
-  {
-    id: 's1',
+    id: 'sample-1',
     name: 'Uncle Roger',
     avatar: 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSa3du6j726GP7-rDxHda8-FYopWptm3LsTWA&s',
+    lastMessage: 'Your order is ready for pickup!',
+    timestamp: 'Just now',
+    orderTag: 'Order #123',
+    isUnread: true,
+    chatId: 'sample-1',
   },
   {
-    id: 's2',
+    id: 'sample-2',
     name: 'Kak Siti',
     avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=400&q=60',
+    lastMessage: 'Thank you for your order!',
+    timestamp: '2h ago',
+    orderTag: null,
+    isUnread: false,
+    chatId: 'sample-2',
   },
 ];
 
-// Chat list data - SELLER SIDE shows chats with buyers
-// All chats must be with buyers (chatId starts with 'b')
-const SELLER_CHATS_DATA = [
+const SAMPLE_SELLER_CHATS: ChatItem[] = [
   {
-    id: '1',
+    id: 'sample-b1',
     name: 'Ahmad bin Abdullah',
     avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=400&q=60',
     lastMessage: 'Is the item available?',
-    timestamp: '10:30 AM',
-    orderTag: 'Order #123',
-    isUnread: true,
-    chatId: 'b1',
-  },
-  {
-    id: '2',
-    name: 'Siti Nurhaliza binti Ahmad',
-    avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=400&q=60',
-    lastMessage: 'Thanks for the update!',
-    timestamp: 'Yesterday',
-    orderTag: null,
-    isUnread: false,
-    chatId: 'b2',
-  },
-  {
-    id: '3',
-    name: 'Lim Wei Ming',
-    avatar: 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&w=400&q=60',
-    lastMessage: 'When can I pick it up?',
-    timestamp: '2 days ago',
+    timestamp: 'Just now',
     orderTag: 'Order #456',
     isUnread: true,
-    chatId: 'b3',
+    chatId: 'sample-b1',
   },
   {
-    id: '4',
-    name: 'Raj Kumar a/l Muthu',
-    avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&w=400&q=60',
-    lastMessage: 'Perfect, see you then!',
-    timestamp: '3 days ago',
+    id: 'sample-b2',
+    name: 'Siti Nurhaliza',
+    avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=400&q=60',
+    lastMessage: 'When can I pick it up?',
+    timestamp: '1h ago',
     orderTag: null,
     isUnread: false,
-    chatId: 'b4',
+    chatId: 'sample-b2',
   },
 ];
 
-// Chat list data - BUYER SIDE shows chats with sellers
-// All chats must be with sellers (chatId starts with 's')
-const BUYER_CHATS_DATA = [
-  {
-    id: '1',
-    name: 'Uncle Roger',
-    avatar: 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSa3du6j726GP7-rDxHda8-FYopWptm3LsTWA&s',
-    lastMessage: 'When would you like to pick it up?',
-    timestamp: '11:45 AM',
-    orderTag: 'Order #XM12345',
-    isUnread: true,
-    chatId: 's1',
-  },
-  {
-    id: '2',
-    name: 'Kak Siti',
-    avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=400&q=60',
-    lastMessage: 'Your order is ready!',
-    timestamp: 'Yesterday',
-    orderTag: null,
-    isUnread: false,
-    chatId: 's2',
-  },
-];
+interface ChatItem {
+  id: string;
+  name: string;
+  avatar: string;
+  lastMessage: string;
+  timestamp: string;
+  orderTag: string | null;
+  isUnread: boolean;
+  chatId: string;
+}
 
 export default function ChatListScreen() {
   const router = useRouter();
@@ -128,13 +79,128 @@ export default function ChatListScreen() {
   
   const [activeTab, setActiveTab] = useState<'all' | 'unread'>('all');
   const [searchQuery, setSearchQuery] = useState('');
-  const [sellerChats, setSellerChats] = useState(SELLER_CHATS_DATA);
-  const [buyerChats, setBuyerChats] = useState(BUYER_CHATS_DATA);
+  const [chats, setChats] = useState<ChatItem[]>([]);
+  const [loading, setLoading] = useState(true);
   const [swipedItemId, setSwipedItemId] = useState<string | null>(null);
   const translateXRefs = useRef<{ [key: string]: Animated.Value }>({});
 
-  // Use buyer chats if user is buyer, seller chats if user is seller
-  const chats = isBuyer ? buyerChats : sellerChats;
+  // Format timestamp
+  const formatTimestamp = (timestamp: string | Date): string => {
+    if (!timestamp) return 'Now';
+    const date = new Date(timestamp);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    
+    if (diffMins < 1) return 'Just now';
+    if (diffMins < 60) return `${diffMins}m ago`;
+    const diffHours = Math.floor(diffMins / 60);
+    if (diffHours < 24) return `${diffHours}h ago`;
+    const diffDays = Math.floor(diffHours / 24);
+    if (diffDays < 7) return `${diffDays}d ago`;
+    return date.toLocaleDateString();
+  };
+
+  // Load chats from API
+  const loadChats = useCallback(async () => {
+    try {
+      const token = getAuthToken();
+      if (!token) {
+        setLoading(false);
+        return;
+      }
+
+      setLoading(true);
+
+      const role = isBuyer ? 'buyer' : 'seller';
+      const url = `${API_URL}/api/chat?role=${role}`;
+      console.log('Fetching chats from:', url);
+      
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      console.log('Chat API response status:', response.status);
+
+      // Handle 404 as empty chats - show sample chats for testing
+      if (response.status === 404) {
+        console.log('No chats found (404) - showing sample chats for testing');
+        setChats(isBuyer ? SAMPLE_BUYER_CHATS : SAMPLE_SELLER_CHATS);
+        setLoading(false);
+        return;
+      }
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+        const errorMessage = errorData?.error || errorData?.message || `Failed with status ${response.status}`;
+        console.error('Chat API error:', response.status, errorMessage, errorData);
+        // For other errors, show sample chats for testing
+        console.log('Showing sample chats due to API error');
+        setChats(isBuyer ? SAMPLE_BUYER_CHATS : SAMPLE_SELLER_CHATS);
+        setLoading(false);
+        return;
+      }
+
+      const data = await response.json();
+      console.log('Chat API data received:', data);
+      
+      // Handle empty array or non-array response
+      if (!Array.isArray(data)) {
+        console.warn('Invalid chat data format, expected array:', data);
+        setChats([]);
+        return;
+      }
+
+      // Format chats
+      const formattedChats: ChatItem[] = data.map((chat: any) => {
+        const partner = isBuyer ? chat.seller : chat.buyer;
+        const lastMessageContent = chat.lastMessage?.content || 'No messages yet';
+        const unreadCount = isBuyer ? chat.unreadCount?.buyer || 0 : chat.unreadCount?.seller || 0;
+
+        return {
+          id: chat._id || chat.id,
+          name: partner?.name || 'User',
+          avatar: partner?.avatar || '',
+          lastMessage: lastMessageContent,
+          timestamp: formatTimestamp(chat.lastMessageAt || chat.createdAt),
+          orderTag: null, // TODO: Get order tag from order if linked
+          isUnread: unreadCount > 0,
+          chatId: chat._id || chat.id,
+        };
+      });
+
+      setChats(formattedChats);
+      console.log('Chats loaded successfully:', formattedChats.length, 'chats');
+    } catch (error: any) {
+      console.error('Error loading chats:', error);
+      console.error('Error details:', {
+        message: error?.message,
+        stack: error?.stack,
+        role: isBuyer ? 'buyer' : 'seller',
+        apiUrl: API_URL,
+      });
+      // On error, show sample chats for testing
+      console.log('Showing sample chats due to error');
+      setChats(isBuyer ? SAMPLE_BUYER_CHATS : SAMPLE_SELLER_CHATS);
+    } finally {
+      setLoading(false);
+    }
+  }, [isBuyer]);
+
+  // Load chats on mount and when screen is focused
+  useEffect(() => {
+    loadChats();
+  }, [loadChats]);
+
+  useFocusEffect(
+    useCallback(() => {
+      loadChats();
+    }, [loadChats])
+  );
 
   const filteredChats = chats.filter((chat) => {
     const matchesSearch = chat.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -150,7 +216,7 @@ export default function ChatListScreen() {
     }
   });
 
-  const handleDelete = (chatId: string) => {
+  const handleDelete = async (chatId: string) => {
     Alert.alert(
       'Delete Chat',
       'Are you sure you want to delete this chat?',
@@ -159,15 +225,35 @@ export default function ChatListScreen() {
         {
           text: 'Delete',
           style: 'destructive',
-          onPress: () => {
-            if (isBuyer) {
-              setBuyerChats(buyerChats.filter(chat => chat.id !== chatId));
-            } else {
-              setSellerChats(sellerChats.filter(chat => chat.id !== chatId));
-            }
-            setSwipedItemId(null);
-            if (translateXRefs.current[chatId]) {
-              translateXRefs.current[chatId].setValue(0);
+          onPress: async () => {
+            try {
+              const token = getAuthToken();
+              if (!token) {
+                Alert.alert('Authentication Error', 'Please log in again.');
+                return;
+              }
+
+              const response = await fetch(`${API_URL}/api/chat/${chatId}`, {
+                method: 'DELETE',
+                headers: {
+                  'Content-Type': 'application/json',
+                  Authorization: `Bearer ${token}`,
+                },
+              });
+
+              if (!response.ok) {
+                throw new Error('Failed to delete chat');
+              }
+
+              // Refresh chat list
+              await loadChats();
+              setSwipedItemId(null);
+              if (translateXRefs.current[chatId]) {
+                translateXRefs.current[chatId].setValue(0);
+              }
+            } catch (error: any) {
+              console.error('Error deleting chat:', error);
+              Alert.alert('Error', `Failed to delete chat: ${error.message}`);
             }
           },
         },
@@ -175,7 +261,7 @@ export default function ChatListScreen() {
     );
   };
 
-  const handleChatPress = (chat: typeof SELLER_CHATS_DATA[0] | typeof BUYER_CHATS_DATA[0]) => {
+  const handleChatPress = (chat: ChatItem) => {
     // Close any swiped items first
     if (swipedItemId) {
       const translateX = translateXRefs.current[swipedItemId];
@@ -240,7 +326,7 @@ export default function ChatListScreen() {
     });
   };
 
-  const renderChatItem = ({ item }: { item: typeof SELLER_CHATS_DATA[0] | typeof BUYER_CHATS_DATA[0] }) => {
+  const renderChatItem = ({ item }: { item: ChatItem }) => {
     const translateX = translateXRefs.current[item.id] || new Animated.Value(0);
     const panResponder = createPanResponder(item.id);
 
@@ -308,13 +394,21 @@ export default function ChatListScreen() {
                 overflow: 'hidden',
                 marginRight: 12,
                 backgroundColor: '#E8F3E0',
+                alignItems: 'center',
+                justifyContent: 'center',
               }}
             >
-              <Image
-                source={{ uri: item.avatar }}
-                style={{ width: '100%', height: '100%' }}
-                resizeMode="cover"
-              />
+              {item.avatar ? (
+                <Image
+                  source={{ uri: item.avatar }}
+                  style={{ width: '100%', height: '100%' }}
+                  resizeMode="cover"
+                />
+              ) : (
+                <Text className="text-lg font-semibold" style={{ color: '#2C4A34', fontFamily: 'System' }}>
+                  {item.name[0]}
+                </Text>
+              )}
             </View>
 
             {/* Chat Info */}
@@ -479,13 +573,19 @@ export default function ChatListScreen() {
 
       {/* Chat List */}
       <View style={{ flex: 1, backgroundColor: '#365441' }}>
-        <FlatList
-          data={filteredChats}
-          renderItem={renderChatItem}
-          keyExtractor={(item) => item.id}
-          contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 8, paddingBottom: 20 }}
-          ListEmptyComponent={renderEmptyState}
-        />
+        {loading ? (
+          <View className="flex-1 items-center justify-center">
+            <ActivityIndicator size="large" color="#E8F3E0" />
+          </View>
+        ) : (
+          <FlatList
+            data={filteredChats}
+            renderItem={renderChatItem}
+            keyExtractor={(item) => item.id}
+            contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 8, paddingBottom: 20 }}
+            ListEmptyComponent={renderEmptyState}
+          />
+        )}
       </View>
     </View>
   );

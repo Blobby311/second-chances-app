@@ -184,6 +184,11 @@ router.put(
 );
 
 // Get buyer orders
+// NOTE: Buyer and seller data are completely separate:
+// - Buyer orders: filtered by { buyer: userId } - only shows orders where user is the buyer
+// - Seller orders: filtered by { seller: userId } - only shows orders where user is the seller
+// - Products: filtered by { seller: userId } - only shows products created by the seller
+// Switching roles does NOT mix or merge data - each role has its own separate data
 router.get(
   '/buyer/orders',
   authenticate,
@@ -192,6 +197,7 @@ router.get(
   async (req: AuthRequest, res: Response) => {
     try {
       const { status } = req.query;
+      // Only return orders where this user is the buyer - seller data is separate
       let query: any = { buyer: req.userId };
 
       // Map frontend status to backend status

@@ -1,7 +1,10 @@
 import React, { useState, useRef } from 'react';
-import { View, Text, TextInput, TouchableOpacity, ScrollView, StatusBar, Image, PanResponder, Dimensions } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, ScrollView, StatusBar, Image, PanResponder, Dimensions, Alert, Platform, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Menu, DoorOpen, Users, ShoppingCart, Image as ImageIcon } from 'lucide-react-native';
+import * as ImagePicker from 'expo-image-picker';
+import { API_URL } from '../../config/api';
+import { getAuthToken } from '../../config/auth';
 import '../../global.css';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -10,10 +13,12 @@ export default function CreateNewScreen() {
   const router = useRouter();
   const [blindboxName, setBlindboxName] = useState('');
   const [blindboxImage, setBlindboxImage] = useState<string | null>(null);
+  const [description, setDescription] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('Fruits');
   const [selectedPrice, setSelectedPrice] = useState('Free');
   const [customPrice, setCustomPrice] = useState('');
   const [selectedDelivery, setSelectedDelivery] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
   // PanResponder for swipe-to-open menu
   const panResponder = useRef(
     PanResponder.create({
@@ -32,10 +37,156 @@ export default function CreateNewScreen() {
   const categories = ['Fruits', 'Vegetable', 'Mix'];
   const prices = ['Free', 'RM5', 'RM10', 'Custom'];
   const deliveryMethods = [
-    { id: 'doorstep', label: 'Doorstep Delivery', icon: DoorOpen },
-    { id: 'hub', label: 'Hub Collect', icon: Users },
-    { id: 'pickup', label: 'Self Pick-Up', icon: ShoppingCart },
+    { id: 'doorstep', label: 'Doorstep Delivery', icon: DoorOpen, backendValue: 'Doorstep' },
+    { id: 'hub', label: 'Hub Collect', icon: Users, backendValue: 'Hub Collect' },
+    { id: 'pickup', label: 'Self Pick-Up', icon: ShoppingCart, backendValue: 'Self Pick-Up' },
   ];
+
+  const handleGenerate = async () => {
+    // Validation
+    if (!blindboxImage) {
+      Alert.alert('Image Required', 'Please add an image for your blindbox.');
+      return;
+    }
+
+    if (!blindboxName || !blindboxName.trim()) {
+      Alert.alert('Name Required', 'Please enter a name for your blindbox.');
+      return;
+    }
+
+    if (!description || !description.trim()) {
+      Alert.alert('Description Required', 'Please add a description for your blindbox.');
+      return;
+    }
+
+    if (!selectedDelivery) {
+      Alert.alert('Delivery Method Required', 'Please select a delivery method.');
+      return;
+    }
+
+    // Calculate price
+    let price = 0;
+    if (selectedPrice === 'Free') {
+      price = 0;
+    } else if (selectedPrice === 'RM5') {
+      price = 5;
+    } else if (selectedPrice === 'RM10') {
+      price = 10;
+    } else if (selectedPrice === 'Custom') {
+      const customPriceNum = parseFloat(customPrice);
+      if (isNaN(customPriceNum) || customPriceNum < 0) {
+        Alert.alert('Invalid Price', 'Please enter a valid custom price.');
+        return;
+      }
+      price = customPriceNum;
+    }
+
+    // Map category to backend format
+    let category = selectedCategory;
+    if (selectedCategory === 'Vegetable') {
+      category = 'Vegetables'; // Backend expects 'Vegetables' not 'Vegetable'
+    }
+
+    // Map delivery method
+    const deliveryMethodObj = deliveryMethods.find(d => d.id === selectedDelivery);
+    const deliveryMethod = deliveryMethodObj?.backendValue || 'Self Pick-Up';
+
+    try {
+      setLoading(true);
+
+      const token = getAuthToken();
+      if (!token) {
+        Alert.alert('Authentication Required', 'Please log in again.');
+        router.replace('/login');
+        return;
+      }
+
+      // Create FormData for file upload
+      const formData = new FormData();
+      
+      // Add image file
+      const imageUri = blindboxImage;
+      const filename = imageUri.split('/').pop() || 'image.jpg';
+      const match = /\.(\w+)$/.exec(filename);
+      const type = match ? `image/${match[1]}` : 'image/jpeg';
+      
+      formData.append('image', {
+        uri: imageUri,
+        name: filename,
+        type: type,
+      } as any);
+
+      // Add other fields
+      formData.append('name', blindboxName.trim());
+      formData.append('description', description.trim());
+      formData.append('category', category);
+      formData.append('price', price.toString());
+      formData.append('deliveryMethod', deliveryMethod);
+      formData.append('imperfectLevel', '50'); // Default imperfect level
+
+      const response = await fetch(`${API_URL}/api/products`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          // Don't set Content-Type - let FormData set it with boundary
+        },
+        body: formData,
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        const errorMessage = data?.errors?.[0]?.msg || data?.error || 'Failed to create blindbox';
+        Alert.alert('Error', errorMessage);
+        return;
+      }
+
+      // Success!
+      Alert.alert(
+        'Success!',
+        'Your blindbox has been created and is now available for buyers!',
+        [
+          {
+            text: 'OK',
+            onPress: () => {
+              // Navigate to stock page to see the new product
+              router.replace('/(seller)/stock');
+            },
+          },
+        ]
+      );
+    } catch (error: any) {
+      console.error('Error creating blindbox:', error);
+      Alert.alert('Error', 'Failed to create blindbox. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const pickImage = async () => {
+    // Request permissions
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert(
+        'Permission Required',
+        'Sorry, we need camera roll permissions to select an image!'
+      );
+      return;
+    }
+
+    // Launch image picker
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [4, 3],
+      quality: 0.8,
+    });
+
+    if (!result.canceled && result.assets && result.assets.length > 0) {
+      // Store the image URI - this will persist in state
+      setBlindboxImage(result.assets[0].uri);
+    }
+  };
 
   return (
     <View className="flex-1" style={{ backgroundColor: '#365441' }}>
@@ -78,10 +229,7 @@ export default function CreateNewScreen() {
               minHeight: 200,
               borderStyle: blindboxImage ? 'solid' : 'dashed',
             }}
-            onPress={() => {
-              // TODO: Handle image picker
-              console.log('Open image picker');
-            }}
+            onPress={pickImage}
           >
             {blindboxImage ? (
               <Image 
@@ -140,6 +288,8 @@ export default function CreateNewScreen() {
               fontFamily: 'System',
               minHeight: 100,
             }}
+            value={description}
+            onChangeText={setDescription}
             multiline
           />
         </View>
@@ -285,15 +435,17 @@ export default function CreateNewScreen() {
       <View className="px-4 pb-8 pt-4" style={{ backgroundColor: '#365441' }}>
         <TouchableOpacity 
           className="py-4 rounded-3xl items-center"
-          style={{ backgroundColor: '#C85E51' }}
-          onPress={() => {
-            // TODO: Handle generate action
-            console.log('Generate BlindBox');
-          }}
+          style={{ backgroundColor: '#C85E51', opacity: loading ? 0.7 : 1 }}
+          onPress={handleGenerate}
+          disabled={loading}
         >
-          <Text className="text-white text-lg font-bold uppercase" style={{ fontFamily: 'System' }}>
-            GENERATE
-          </Text>
+          {loading ? (
+            <ActivityIndicator color="#ffffff" />
+          ) : (
+            <Text className="text-white text-lg font-bold uppercase" style={{ fontFamily: 'System' }}>
+              GENERATE
+            </Text>
+          )}
         </TouchableOpacity>
       </View>
 

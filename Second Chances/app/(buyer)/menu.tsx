@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, ScrollView, StatusBar } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Menu, Heart, MapPin, GraduationCap, Star, Bell, Settings, MessageCircle, Package } from 'lucide-react-native';
+import { Menu, Heart, MapPin, Star, Bell, Settings, MessageCircle, Package, Bot } from 'lucide-react-native';
 import '../../global.css';
 
 export default function MenuScreen() {
@@ -11,7 +11,7 @@ export default function MenuScreen() {
     { id: '1', title: 'My Orders', icon: Package, route: '/(buyer)/my-orders' },
     { id: '2', title: 'Favorites', icon: Heart, route: '/(buyer)/favorites' },
     { id: '3', title: 'Map', icon: MapPin, route: '/(buyer)/map' },
-    { id: '4', title: 'Learn', icon: GraduationCap, route: '/(buyer)/learn' },
+    { id: '4', title: 'AI Assistant', icon: Bot, route: '/(buyer)/ai-chatbot' },
     { id: '5', title: 'Rewards', icon: Star, route: '/(buyer)/rewards' },
     { id: '6', title: 'Notifications', icon: Bell, route: '/(buyer)/notifications' },
   ];

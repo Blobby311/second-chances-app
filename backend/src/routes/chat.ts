@@ -30,13 +30,91 @@ router.get('/', authenticate, async (req: AuthRequest, res: Response) => {
   }
 });
 
+// Get or create chat with another user (by user ID)
+router.get('/with/:userId', authenticate, async (req: AuthRequest, res: Response) => {
+  try {
+    const otherUserId = req.params.userId;
+    const currentUserId = req.userId;
+
+    if (otherUserId === currentUserId) {
+      return res.status(400).json({ error: 'Cannot create chat with yourself' });
+    }
+
+    // Determine if current user is buyer or seller based on their roles
+    // For now, we'll create chat with current user as buyer and other as seller
+    // This can be adjusted based on business logic
+    let chat = await Chat.findOne({
+      $or: [
+        { buyer: currentUserId, seller: otherUserId },
+        { buyer: otherUserId, seller: currentUserId }
+      ]
+    }).populate('buyer', 'name avatar').populate('seller', 'name avatar');
+
+    if (!chat) {
+      // Create new chat - determine buyer/seller based on user roles
+      // Assuming the current user initiating the chat is the buyer
+      chat = new Chat({
+        buyer: currentUserId,
+        seller: otherUserId,
+      });
+      await chat.save();
+      chat = await Chat.findById(chat._id)
+        .populate('buyer', 'name avatar')
+        .populate('seller', 'name avatar');
+    }
+
+    res.json(chat);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Get chat messages
 router.get('/:id/messages', authenticate, async (req: AuthRequest, res: Response) => {
   try {
-    const chat = await Chat.findById(req.params.id);
+    let chat = await Chat.findById(req.params.id);
 
+    // If chat not found by ID, try to find/create by user ID
     if (!chat) {
-      return res.status(404).json({ error: 'Chat not found' });
+      // Check if it might be a user ID - try to get or create chat
+      try {
+        const otherUserId = req.params.id;
+        const currentUserId = req.userId;
+
+        chat = await Chat.findOne({
+          $or: [
+            { buyer: currentUserId, seller: otherUserId },
+            { buyer: otherUserId, seller: currentUserId }
+          ]
+        });
+
+        if (!chat) {
+          // Create new chat
+          chat = new Chat({
+            buyer: currentUserId,
+            seller: otherUserId,
+          });
+          await chat.save();
+        }
+
+        // Redirect to use the chat ID
+        const messages = await Message.find({ chat: chat._id })
+          .populate('sender', 'name avatar')
+          .sort({ createdAt: 1 });
+
+        // Mark as read
+        if (chat.buyer.toString() === req.userId) {
+          chat.unreadCount.buyer = 0;
+        } else {
+          chat.unreadCount.seller = 0;
+        }
+        await chat.save();
+
+        return res.json(messages);
+      } catch (err) {
+        // Not a valid user ID, return 404
+        return res.status(404).json({ error: 'Chat not found' });
+      }
     }
 
     // Check authorization
@@ -71,18 +149,30 @@ router.post(
     try {
       let chat = await Chat.findById(req.params.id);
 
+      // If chat not found by ID, try to find/create by user ID
       if (!chat) {
-        // Create new chat if doesn't exist
-        const { buyerId, sellerId } = req.body;
-        if (!buyerId || !sellerId) {
-          return res.status(400).json({ error: 'Buyer and seller IDs required' });
-        }
+        try {
+          const otherUserId = req.params.id;
+          const currentUserId = req.userId;
 
-        chat = new Chat({
-          buyer: buyerId,
-          seller: sellerId,
-        });
-        await chat.save();
+          chat = await Chat.findOne({
+            $or: [
+              { buyer: currentUserId, seller: otherUserId },
+              { buyer: otherUserId, seller: currentUserId }
+            ]
+          });
+
+          if (!chat) {
+            // Create new chat - current user is buyer, other is seller
+            chat = new Chat({
+              buyer: currentUserId,
+              seller: otherUserId,
+            });
+            await chat.save();
+          }
+        } catch (err) {
+          return res.status(404).json({ error: 'Chat not found' });
+        }
       }
 
       // Check authorization

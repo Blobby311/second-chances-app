@@ -57,7 +57,12 @@ export default function LoginScreen() {
 
       if (!response.ok) {
         const message = data?.errors?.[0]?.msg || data?.error || 'Login failed';
-        setError(message);
+        // Show user-friendly message
+        if (message.toLowerCase().includes('invalid') || message.toLowerCase().includes('credentials')) {
+          setError('Invalid email or password');
+        } else {
+          setError(message);
+        }
         return;
       }
 
@@ -76,8 +81,9 @@ export default function LoginScreen() {
       } else {
         router.replace('/(buyer)/home');
       }
-    } catch (err) {
-      setError('Unable to reach server. Please try again.');
+    } catch (err: any) {
+      console.error('Login error:', err);
+      setError(err?.message || 'Unable to reach server. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -169,17 +175,24 @@ export default function LoginScreen() {
             </View>
           ) : null}
 
-          {/* Remember Me */}
-          <View className="flex-row items-center">
-            <Switch
-              value={rememberMe}
-              onValueChange={setRememberMe}
-              trackColor={{ false: '#d1d5db', true: '#C85E51' }}
-              thumbColor={rememberMe ? '#ffffff' : '#f3f4f6'}
-            />
-            <Text className="ml-2 text-base" style={{ color: '#6b7280', fontFamily: 'System' }}>
-              Remember me
-            </Text>
+          {/* Remember Me and Forgot Password */}
+          <View className="flex-row items-center justify-between mb-3">
+            <View className="flex-row items-center">
+              <Switch
+                value={rememberMe}
+                onValueChange={setRememberMe}
+                trackColor={{ false: '#d1d5db', true: '#C85E51' }}
+                thumbColor={rememberMe ? '#ffffff' : '#f3f4f6'}
+              />
+              <Text className="ml-2 text-base" style={{ color: '#6b7280', fontFamily: 'System' }}>
+                Remember me
+              </Text>
+            </View>
+            <TouchableOpacity onPress={() => router.push('/forgot-password')}>
+              <Text className="text-base font-semibold" style={{ color: '#2C4A34', fontFamily: 'System' }}>
+                Forgot Password?
+              </Text>
+            </TouchableOpacity>
           </View>
         </View>
 

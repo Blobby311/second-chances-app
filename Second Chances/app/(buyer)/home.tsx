@@ -111,9 +111,9 @@ export default function BuyerHomeScreen() {
   const filteredData = useMemo(() => products, [products]);
 
   const renderProductCard = ({ item }: { item: any }) => {
-    const id = item._id || item.id;
+    const productId = item._id || item.id;
     const isFree = item.price === 0;
-    const isFavorited = favoritedIds.includes(id);
+    const isFavorited = favoritedIds.includes(productId);
     const imageUri = item.imageUrl
       ? item.imageUrl.startsWith('http')
         ? item.imageUrl
@@ -128,14 +128,15 @@ export default function BuyerHomeScreen() {
         onPress={() =>
           router.push({
             pathname: '/product/[id]',
-            params: { id: item.id },
+            params: { id: productId },
           })
         }
       >
         <ImageBackground
-          source={{ uri: item.imageUrl }}
+          source={{ uri: imageUri }}
           style={{ height: 140, borderTopLeftRadius: 24, borderTopRightRadius: 24, overflow: 'hidden' }}
           imageStyle={{ borderTopLeftRadius: 24, borderTopRightRadius: 24 }}
+          defaultSource={require('../../assets/logo.png')}
         >
           <View className="p-3 flex-row justify-between items-start">
             <View className="flex-1 flex-row items-start" style={{ gap: 6 }}>
@@ -166,7 +167,7 @@ export default function BuyerHomeScreen() {
             <TouchableOpacity
               onPress={(e) => {
                 e.stopPropagation();
-                toggleFavorite(id);
+                toggleFavorite(productId);
               }}
               style={{
                 width: 36,

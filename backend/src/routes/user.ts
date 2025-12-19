@@ -123,6 +123,41 @@ router.get('/referrals/stats', authenticate, async (req: AuthRequest, res: Respo
   }
 });
 
+// Add role to user (allows users to have both buyer and seller roles)
+router.post(
+  '/add-role',
+  authenticate,
+  [body('role').isIn(['buyer', 'seller']).withMessage('Role must be buyer or seller')],
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({ errors: errors.array() });
+      }
+
+      const { role } = req.body;
+      const user = await User.findById(req.userId);
+
+      if (!user) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+
+      // Add role if not already present
+      if (!user.roles.includes(role)) {
+        user.roles.push(role);
+        await user.save();
+      }
+
+      res.json({ 
+        message: 'Role added successfully',
+        roles: user.roles 
+      });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  }
+);
+
 // Delete account
 router.delete('/account', authenticate, async (req: AuthRequest, res: Response) => {
   try {

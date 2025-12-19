@@ -1,7 +1,7 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { View, Text, TouchableOpacity, FlatList, TextInput, KeyboardAvoidingView, Platform, StatusBar, ActivityIndicator } from 'react-native';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { View, Text, TouchableOpacity, FlatList, TextInput, KeyboardAvoidingView, Platform, StatusBar, ActivityIndicator, Keyboard } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { ArrowLeft, Send, Bot } from 'lucide-react-native';
 import '../../global.css';
 import { API_URL } from '../../config/api';
@@ -13,69 +13,78 @@ export default function AIChatbotScreen() {
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [loadingHistory, setLoadingHistory] = useState(true);
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
   const flatListRef = useRef<FlatList>(null);
 
-  // Load chat history on mount
-  useEffect(() => {
-    const loadChatHistory = async () => {
-      try {
-        const token = getAuthToken();
-        if (!token) {
-          // If not authenticated, show welcome message
-          setMessages([{
-            id: '1',
-            sender: 'bot',
-            content: 'Hello! I\'m your AI Plant Assistant powered by GPT OSS 120B. Ask me anything about growing plants, sustainable food practices, tips, and tricks!',
-            timestamp: 'Now',
-          }]);
-          setLoadingHistory(false);
-          return;
-        }
-
-        const response = await fetch(`${API_URL}/api/ai/chat/history`, {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
-          },
-        });
-
-        const data = await response.json();
-
-        if (response.ok && Array.isArray(data) && data.length > 0) {
-          // Load existing messages
-          const formattedMessages = data.map((msg: any) => ({
-            id: msg.id,
-            sender: msg.sender,
-            content: msg.content,
-            timestamp: formatTimestamp(msg.timestamp),
-          }));
-          setMessages(formattedMessages);
-        } else {
-          // No history, show welcome message
-          setMessages([{
-            id: '1',
-            sender: 'bot',
-            content: 'Hello! I\'m your AI Plant Assistant powered by GPT OSS 120B. Ask me anything about growing plants, sustainable food practices, tips, and tricks!',
-            timestamp: 'Now',
-          }]);
-        }
-      } catch (error) {
-        console.error('Error loading chat history:', error);
-        // Show welcome message on error
+  // Load chat history function
+  const loadChatHistory = useCallback(async () => {
+    try {
+      const token = getAuthToken();
+      if (!token) {
+        // If not authenticated, show welcome message
         setMessages([{
           id: '1',
           sender: 'bot',
           content: 'Hello! I\'m your AI Plant Assistant powered by GPT OSS 120B. Ask me anything about growing plants, sustainable food practices, tips, and tricks!',
           timestamp: 'Now',
         }]);
-      } finally {
         setLoadingHistory(false);
+        return;
       }
-    };
 
-    loadChatHistory();
+      const response = await fetch(`${API_URL}/api/ai/chat/history?role=seller`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      const data = await response.json();
+
+      if (response.ok && Array.isArray(data) && data.length > 0) {
+        // Load existing messages
+        const formattedMessages = data.map((msg: any) => ({
+          id: msg.id,
+          sender: msg.sender,
+          content: msg.content,
+          timestamp: formatTimestamp(msg.timestamp),
+        }));
+        setMessages(formattedMessages);
+      } else {
+        // No history, show welcome message
+        setMessages([{
+          id: '1',
+          sender: 'bot',
+          content: 'Hello! I\'m your AI Plant Assistant powered by GPT OSS 120B. Ask me anything about growing plants, sustainable food practices, tips, and tricks!',
+          timestamp: 'Now',
+        }]);
+      }
+    } catch (error) {
+      console.error('Error loading chat history:', error);
+      // Show welcome message on error
+      setMessages([{
+        id: '1',
+        sender: 'bot',
+        content: 'Hello! I\'m your AI Plant Assistant powered by GPT OSS 120B. Ask me anything about growing plants, sustainable food practices, tips, and tricks!',
+        timestamp: 'Now',
+      }]);
+    } finally {
+      setLoadingHistory(false);
+    }
   }, []);
+
+  // Load chat history on mount
+  useEffect(() => {
+    loadChatHistory();
+  }, [loadChatHistory]);
+
+  // Reload chat history when screen is focused
+  useFocusEffect(
+    useCallback(() => {
+      loadChatHistory();
+    }, [loadChatHistory])
+  );
 
   const formatTimestamp = (timestamp: string | Date): string => {
     if (!timestamp) return 'Now';
@@ -119,7 +128,7 @@ export default function AIChatbotScreen() {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ message: text }),
+        body: JSON.stringify({ message: text, role: 'seller' }), // Specify seller role
       });
 
       const data = await response.json();
@@ -142,7 +151,7 @@ export default function AIChatbotScreen() {
       // But do it in background to not block UI
       setTimeout(async () => {
         try {
-          const historyResponse = await fetch(`${API_URL}/api/ai/chat/history`, {
+          const historyResponse = await fetch(`${API_URL}/api/ai/chat/history?role=seller`, {
             method: 'GET',
             headers: {
               'Content-Type': 'application/json',
@@ -184,6 +193,31 @@ export default function AIChatbotScreen() {
       }, 100);
     }
   }, [messages]);
+
+  // Handle keyboard show/hide to auto-scroll messages
+  useEffect(() => {
+    const keyboardDidShowListener = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
+      (e) => {
+        setKeyboardHeight(e.endCoordinates.height);
+        // Scroll to end when keyboard appears so input is visible
+        setTimeout(() => {
+          flatListRef.current?.scrollToEnd({ animated: true });
+        }, 100);
+      }
+    );
+    const keyboardDidHideListener = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
+      () => {
+        setKeyboardHeight(0);
+      }
+    );
+
+    return () => {
+      keyboardDidShowListener.remove();
+      keyboardDidHideListener.remove();
+    };
+  }, []);
 
   const renderMessage = ({ item }: { item: typeof messages[0] }) => {
     const isBot = item.sender === 'bot';
@@ -228,7 +262,7 @@ export default function AIChatbotScreen() {
   };
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: '#365441' }} edges={['top', 'bottom']}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: '#365441' }} edges={['top']}>
       <StatusBar barStyle="light-content" />
       
       {/* Header */}
@@ -267,7 +301,7 @@ export default function AIChatbotScreen() {
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 20}
       >
         {/* Messages List */}
         {loadingHistory ? (

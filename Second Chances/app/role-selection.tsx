@@ -3,7 +3,7 @@ import { View, Text, TouchableOpacity, Image, ActivityIndicator } from 'react-na
 import { useRouter } from 'expo-router';
 import { Package, ShoppingBag } from 'lucide-react-native';
 import '../global.css';
-import { getAuthToken } from '../config/auth';
+import { getAuthToken, loadPreferredRole, getPreferredRole, setPreferredRole } from '../config/auth';
 import { API_URL } from '../config/api';
 
 export default function RoleSelectionScreen() {
@@ -14,7 +14,9 @@ export default function RoleSelectionScreen() {
     const checkUserRole = async () => {
       const token = getAuthToken();
       if (!token) {
-        router.replace('/login');
+        // No token means a new or logged-out user coming from the login "Sign Up" flow.
+        // In this case we want to show the role selection screen instead of redirecting.
+        setLoading(false);
         return;
       }
 
@@ -28,10 +30,27 @@ export default function RoleSelectionScreen() {
         if (response.ok) {
           const user = await response.json();
           const roles = user.roles || [];
-          // If user already has a role, navigate to their home
+
+          // Load any previously chosen preferred role
+          await loadPreferredRole();
+          const preferred = getPreferredRole();
+
+          // If user has a preferred role and it matches their roles, go there
+          if (preferred === 'seller' && roles.includes('seller')) {
+            router.replace('/(seller)/dashboard');
+            return;
+          }
+          if (preferred === 'buyer' && roles.includes('buyer')) {
+            router.replace('/(buyer)/home');
+            return;
+          }
+
+          // Otherwise fall back to default role selection
           if (roles.includes('seller')) {
+            await setPreferredRole('seller');
             router.replace('/(seller)/dashboard');
           } else if (roles.includes('buyer')) {
+            await setPreferredRole('buyer');
             router.replace('/(buyer)/home');
           } else {
             // New user without role, show selection

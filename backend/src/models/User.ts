@@ -22,6 +22,8 @@ export interface IUser extends Document {
     language: string;
     theme: string;
   };
+  resetToken?: string;
+  resetTokenExpiry?: Date;
   createdAt: Date;
   updatedAt: Date;
   comparePassword(candidatePassword: string): Promise<boolean>;
@@ -36,7 +38,7 @@ const UserSchema = new Schema<IUser>(
     avatar: { type: String },
     roles: [{ type: String, enum: ['buyer', 'seller'], default: ['buyer'] }],
     isVerified: { type: Boolean, default: false },
-    referralCode: { type: String, unique: true, required: true },
+    referralCode: { type: String, unique: true, sparse: true }, // Not required - generated in pre-save hook
     referredBy: { type: Schema.Types.ObjectId, ref: 'User' },
     location: {
       latitude: { type: Number },
@@ -49,6 +51,8 @@ const UserSchema = new Schema<IUser>(
       language: { type: String, default: 'en' },
       theme: { type: String, default: 'light' },
     },
+    resetToken: { type: String },
+    resetTokenExpiry: { type: Date },
   },
   { timestamps: true }
 );

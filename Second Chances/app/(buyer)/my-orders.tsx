@@ -52,6 +52,8 @@ export default function MyOrdersScreen() {
         ? `${API_URL}/api/orders/buyer/orders?status=${status}`
         : `${API_URL}/api/orders/buyer/orders`;
 
+      console.log('Fetching orders from:', url);
+      
       const response = await fetch(url, {
         method: 'GET',
         headers: {
@@ -60,11 +62,26 @@ export default function MyOrdersScreen() {
         },
       });
 
+      console.log('Response status:', response.status, response.statusText);
+
       if (!response.ok) {
-        throw new Error('Failed to fetch orders');
+        // Try to get error message from response
+        let errorMessage = 'Failed to fetch orders';
+        try {
+          const errorData = await response.json();
+          errorMessage = errorData.error || errorData.message || errorMessage;
+          console.error('Error response:', errorData);
+        } catch (e) {
+          // Response might not be JSON
+          const text = await response.text();
+          console.error('Error response (text):', text);
+          errorMessage = `Server error: ${response.status} ${response.statusText}`;
+        }
+        throw new Error(errorMessage);
       }
 
       const data = await response.json();
+      console.log('Orders fetched successfully:', data.length, 'orders');
 
       // Transform backend data to frontend format
       const formattedOrders: OrderItem[] = data.map((order: any) => {
@@ -96,7 +113,18 @@ export default function MyOrdersScreen() {
       setOrders(formattedOrders);
     } catch (error: any) {
       console.error('Error fetching orders:', error);
-      Alert.alert('Error', 'Failed to load orders. Please try again.');
+      const errorMessage = error?.message || 'Failed to load orders';
+      
+      // Show more specific error messages
+      if (errorMessage.includes('401') || errorMessage.includes('Unauthorized')) {
+        Alert.alert('Authentication Error', 'Please log in again.');
+      } else if (errorMessage.includes('403') || errorMessage.includes('Forbidden')) {
+        Alert.alert('Access Denied', 'You need buyer role to view orders.');
+      } else if (errorMessage.includes('Network') || errorMessage.includes('fetch')) {
+        Alert.alert('Connection Error', 'Unable to reach server. Please check your internet connection.');
+      } else {
+        Alert.alert('Error', errorMessage);
+      }
     } finally {
       setLoading(false);
     }

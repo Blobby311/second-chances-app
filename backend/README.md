@@ -185,6 +185,15 @@ The server will start on `http://localhost:3000` (or the port specified in `.env
 - `GET /api/ai/chat/history` - Get chat history
 - `POST /api/ai/food-assistant` - Food assistant
 - `GET /api/ai/buyer/recent-purchases` - Get recent purchases
+- `GET /api/ai/debug?check=true` - Diagnostic endpoint: returns whether `GROQ_API_KEY` is configured and (if `check=true`) optionally checks Groq API reachability (safe, minimal request). Example:
+
+```bash
+# Check config only
+curl -s "http://localhost:3000/api/ai/debug" | jq
+
+# Config + quick reachability check (may perform an API request to Groq)
+curl -s "http://localhost:3000/api/ai/debug?check=true" | jq
+```
 
 ### Referrals
 - `POST /api/referrals/apply` - Apply referral code

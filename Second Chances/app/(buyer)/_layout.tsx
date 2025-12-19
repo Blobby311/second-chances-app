@@ -34,6 +34,7 @@ export default function BuyerLayout() {
       <Stack.Screen name="help" />
       <Stack.Screen name="my-orders" />
       <Stack.Screen name="order-detail/[id]" />
+      <Stack.Screen name="ai-chatbot" />
     </Stack>
   );
 }

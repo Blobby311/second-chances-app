@@ -26,6 +26,7 @@ import notificationRoutes from './routes/notifications';
 import profileRoutes from './routes/profiles';
 import guideRoutes from './routes/guides';
 import aiRoutes from './routes/ai';
+import aiDebugRoutes from './routes/aiDebug';
 import referralRoutes from './routes/referrals';
 
 // Load environment variables
@@ -44,7 +45,7 @@ const PORT = getPort();
 
 // Middleware
 app.use(cors({
-  origin: process.env.CORS_ORIGIN || 'http://localhost:8081',
+  origin: process.env.CORS_ORIGIN || '*', // Allow all origins in development (for phone testing)
   credentials: true,
 }));
 app.use(express.json());
@@ -73,6 +74,8 @@ app.use('/api/notifications', notificationRoutes);
 app.use('/api', profileRoutes);
 app.use('/api/guides', guideRoutes);
 app.use('/api/ai', aiRoutes);
+// Diagnostic route for AI service health and configuration (non-secret)
+app.use('/api/ai', aiDebugRoutes);
 app.use('/api/referrals', referralRoutes);
 
 // Health check
@@ -107,6 +110,9 @@ connectDB().then(() => {
     if (isAzureEnvironment()) {
       console.log(`Azure App Service: ${process.env.WEBSITE_SITE_NAME || 'N/A'}`);
     }
+
+    // Non-secret diagnostic: indicate whether the GROQ API key is configured in the environment
+    console.info(`[AI] GROQ_API_KEY present: ${!!process.env.GROQ_API_KEY ? 'Yes' : 'No'}`);
   });
 });
 

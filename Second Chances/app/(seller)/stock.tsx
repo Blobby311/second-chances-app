@@ -1,87 +1,35 @@
-import React, { useState, useMemo, useRef } from 'react';
-import { View, Text, TouchableOpacity, FlatList, StatusBar, Image, Alert, PanResponder, Dimensions } from 'react-native';
-import { useRouter } from 'expo-router';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
+import { View, Text, TouchableOpacity, FlatList, StatusBar, Image, Alert, PanResponder, Dimensions, ActivityIndicator } from 'react-native';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { Menu, Pencil, Trash2 } from 'lucide-react-native';
 import '../../global.css';
+import { API_URL } from '../../config/api';
+import { getAuthToken } from '../../config/auth';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
-// TODO: Replace with API call
-const STOCK_DATA = {
-  'To Ship': [
-    {
-      id: '1',
-      name: 'Rescued Veggie Box',
-      category: 'Vegetables',
-      price: 'RM10',
-      bestBefore: '01-09-25',
-      status: 'Available',
-      deliveryMethod: 'Grab',
-      imageUrl: 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQRQEytqdym2soe7nH5Tqqe4X1GvyNbDbUs0A&s',
-    },
-    {
-      id: '2',
-      name: 'Sunrise Fruit Crate',
-      category: 'Fruits',
-      price: 'RM15',
-      bestBefore: '02-09-25',
-      status: 'Available',
-      deliveryMethod: 'Doorstep',
-      imageUrl: 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRSimGyJxyM2BpGcrcv9_b_lskXGFHA_TPoOw&s',
-    },
-    {
-      id: '3',
-      name: 'Organic Veg Rescue',
-      category: 'Vegetables',
-      price: 'RM12',
-      bestBefore: '03-09-25',
-      status: 'Available',
-      deliveryMethod: 'Self Pick-Up',
-      imageUrl: 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcS0NTZmv6zIanNf621NF_dJQNoCb4eYQNAAzQ&s',
-    },
-  ],
-  'Delivered': [
-    {
-      id: '4',
-      name: 'Neighbor\'s Free Gift',
-      category: 'Mix',
-      price: 'RM0',
-      bestBefore: '01-09-25',
-      status: 'Delivered',
-      deliveryMethod: 'Grab',
-      imageUrl: 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTmAps3JJfGUb6r7bvZZL6zHjAzgxvMvD2Ijg&s',
-    },
-    {
-      id: '5',
-      name: 'Fresh Fruit Basket',
-      category: 'Fruits',
-      price: 'RM18',
-      bestBefore: '02-09-25',
-      status: 'Delivered',
-      deliveryMethod: 'Doorstep',
-      imageUrl: 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQRQEytqdym2soe7nH5Tqqe4X1GvyNbDbUs0A&s',
-    },
-  ],
-  'Cancelled': [
-    {
-      id: '6',
-      name: 'Mixed Veggie Box',
-      category: 'Vegetables',
-      price: 'RM10',
-      bestBefore: '01-09-25',
-      status: 'Cancelled',
-      deliveryMethod: null,
-      imageUrl: 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRSimGyJxyM2BpGcrcv9_b_lskXGFHA_TPoOw&s',
-    },
-  ],
-};
-
 const TABS = ['To Ship', 'Delivered', 'Cancelled'];
+
+interface StockItem {
+  id: string;
+  name: string;
+  category: string;
+  price: string;
+  bestBefore?: string;
+  status: string;
+  deliveryMethod: string | null;
+  imageUrl: string;
+}
 
 export default function StockScreen() {
   const router = useRouter();
   const [selectedTab, setSelectedTab] = useState('To Ship');
-  const [stockData, setStockData] = useState<typeof STOCK_DATA>(STOCK_DATA);
+  const [stockData, setStockData] = useState<{ [key: string]: StockItem[] }>({
+    'To Ship': [],
+    'Delivered': [],
+    'Cancelled': [],
+  });
+  const [loading, setLoading] = useState(true);
   
   // PanResponder for swipe-to-open menu
   const panResponder = useRef(
@@ -98,11 +46,113 @@ export default function StockScreen() {
     })
   ).current;
 
+  // Fetch stock from API
+  const fetchStock = async () => {
+    try {
+      setLoading(true);
+      const token = getAuthToken();
+      if (!token) {
+        Alert.alert('Authentication Error', 'Please log in again.');
+        router.replace('/login');
+        return;
+      }
+
+      // Fetch all products for this seller
+      const response = await fetch(`${API_URL}/api/seller/stock`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => null);
+        throw new Error(errorData?.error || `Failed with status ${response.status}`);
+      }
+
+      const products = await response.json();
+
+      // Map backend status to frontend tabs
+      const mappedData: { [key: string]: StockItem[] } = {
+        'To Ship': [],
+        'Delivered': [],
+        'Cancelled': [],
+      };
+
+      products.forEach((product: any) => {
+        // Map backend status to frontend status
+        let tabKey = 'To Ship';
+        let displayStatus = 'Available';
+        
+        if (product.status === 'delivered') {
+          tabKey = 'Delivered';
+          displayStatus = 'Delivered';
+        } else if (product.status === 'cancelled') {
+          tabKey = 'Cancelled';
+          displayStatus = 'Cancelled';
+        } else {
+          // to-ship or any other status goes to "To Ship"
+          tabKey = 'To Ship';
+          displayStatus = 'Available';
+        }
+
+        // Format image URL
+        let imageUrl = product.imageUrl || '';
+        if (imageUrl && !imageUrl.startsWith('http')) {
+          // If it's a relative path, prepend the API URL
+          imageUrl = `${API_URL}${imageUrl}`;
+        }
+
+        // Format price
+        const priceStr = product.price === 0 ? 'Free' : `RM${product.price.toFixed(2)}`;
+
+        // Format best before date if available
+        let bestBefore = '';
+        if (product.bestBefore) {
+          const date = new Date(product.bestBefore);
+          bestBefore = `${String(date.getDate()).padStart(2, '0')}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getFullYear()).slice(-2)}`;
+        }
+
+        const stockItem: StockItem = {
+          id: product._id || product.id,
+          name: product.name,
+          category: product.category || 'Mix',
+          price: priceStr,
+          bestBefore: bestBefore || undefined,
+          status: displayStatus,
+          deliveryMethod: product.deliveryMethod || null,
+          imageUrl: imageUrl,
+        };
+
+        mappedData[tabKey].push(stockItem);
+      });
+
+      setStockData(mappedData);
+    } catch (error: any) {
+      console.error('Error fetching stock:', error);
+      Alert.alert('Error', `Failed to load stock: ${error.message}. Please try again.`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Fetch stock on mount and when screen is focused
+  useEffect(() => {
+    fetchStock();
+  }, []);
+
+  useFocusEffect(
+    React.useCallback(() => {
+      fetchStock();
+    }, [])
+  );
+
   const filteredData = useMemo(() => {
-    return stockData[selectedTab as keyof typeof stockData] || [];
+    return stockData[selectedTab] || [];
   }, [selectedTab, stockData]);
 
-  const handleDelete = (itemId: string, tab: string, itemName: string) => {
+  const handleDelete = async (itemId: string, itemName: string) => {
     Alert.alert(
       'Delete Item',
       `Are you sure you want to delete "${itemName}"? This action cannot be undone.`,
@@ -114,30 +164,38 @@ export default function StockScreen() {
         {
           text: 'Delete',
           style: 'destructive',
-          onPress: () => {
-            setStockData((prev) => {
-              const newData = { ...prev };
-              const tabKey = tab as keyof typeof newData;
-              if (newData[tabKey]) {
-                newData[tabKey] = newData[tabKey].filter((item) => item.id !== itemId) as any;
+          onPress: async () => {
+            try {
+              const token = getAuthToken();
+              if (!token) {
+                Alert.alert('Authentication Error', 'Please log in again.');
+                return;
               }
-              return newData;
-            });
+
+              const response = await fetch(`${API_URL}/api/products/${itemId}`, {
+                method: 'DELETE',
+                headers: {
+                  'Content-Type': 'application/json',
+                  Authorization: `Bearer ${token}`,
+                },
+              });
+
+              if (!response.ok) {
+                const errorData = await response.json().catch(() => null);
+                throw new Error(errorData?.error || 'Failed to delete product');
+              }
+
+              // Refresh stock list
+              await fetchStock();
+              Alert.alert('Success', 'Product deleted successfully.');
+            } catch (error: any) {
+              console.error('Error deleting product:', error);
+              Alert.alert('Error', `Failed to delete product: ${error.message}`);
+            }
           },
         },
       ]
     );
-  };
-
-  type StockItem = {
-    id: string;
-    name: string;
-    category: string;
-    price: string;
-    bestBefore: string;
-    status: string;
-    deliveryMethod: string | null;
-    imageUrl: string;
   };
 
   const renderStockItem = ({ item }: { item: StockItem }) => (
@@ -151,7 +209,7 @@ export default function StockScreen() {
     >
       {/* Product Image */}
       <Image
-        source={{ uri: item.imageUrl }}
+        source={{ uri: item.imageUrl || 'https://via.placeholder.com/60' }}
         style={{
           width: 60,
           height: 60,
@@ -203,7 +261,7 @@ export default function StockScreen() {
         </TouchableOpacity>
         <TouchableOpacity
           onPress={() => {
-            handleDelete(item.id, selectedTab, item.name);
+            handleDelete(item.id, item.name);
           }}
         >
           <Trash2 size={20} stroke="#C85E51" />
@@ -216,19 +274,19 @@ export default function StockScreen() {
     <View className="flex-1" style={{ backgroundColor: '#365441' }}>
       <StatusBar barStyle="light-content" />
       
-          {/* Header */}
-          <View
-            className="flex-row items-center justify-between px-4"
-            style={{ backgroundColor: '#2C4A34', paddingTop: 60, paddingBottom: 12 }}
-          >
-            <TouchableOpacity onPress={() => router.push('/(seller)/menu')}>
-              <Menu size={24} stroke="#ffffff" />
-            </TouchableOpacity>
-            <Text className="text-xl font-bold" style={{ color: '#ffffff', fontFamily: 'System' }}>
-              Stock List
-            </Text>
-            <View style={{ width: 24 }} />
-          </View>
+      {/* Header */}
+      <View
+        className="flex-row items-center justify-between px-4"
+        style={{ backgroundColor: '#2C4A34', paddingTop: 60, paddingBottom: 12 }}
+      >
+        <TouchableOpacity onPress={() => router.push('/(seller)/menu')}>
+          <Menu size={24} stroke="#ffffff" />
+        </TouchableOpacity>
+        <Text className="text-xl font-bold" style={{ color: '#ffffff', fontFamily: 'System' }}>
+          Stock List
+        </Text>
+        <View style={{ width: 24 }} />
+      </View>
 
       {/* Navigation Tabs */}
       <View className="px-4 py-3" style={{ backgroundColor: '#365441' }}>
@@ -264,22 +322,27 @@ export default function StockScreen() {
         style={{ flex: 1 }}
         {...panResponder.panHandlers}
       >
-        <FlatList
-          data={filteredData}
-          renderItem={renderStockItem}
-          keyExtractor={(item) => item.id}
-          contentContainerStyle={{ padding: 16, paddingBottom: 20 }}
-          ListEmptyComponent={
-            <View className="items-center mt-12">
-              <Text className="text-base" style={{ color: '#E8F3E0', fontFamily: 'System' }}>
-                No items in this category
-              </Text>
-            </View>
-          }
-        />
+        {loading ? (
+          <View className="flex-1 items-center justify-center">
+            <ActivityIndicator size="large" color="#E8F3E0" />
+          </View>
+        ) : (
+          <FlatList
+            data={filteredData}
+            renderItem={renderStockItem}
+            keyExtractor={(item) => item.id}
+            contentContainerStyle={{ padding: 16, paddingBottom: 20 }}
+            ListEmptyComponent={
+              <View className="items-center mt-12">
+                <Text className="text-base" style={{ color: '#E8F3E0', fontFamily: 'System' }}>
+                  No items in this category
+                </Text>
+              </View>
+            }
+          />
+        )}
       </View>
 
     </View>
   );
 }
-

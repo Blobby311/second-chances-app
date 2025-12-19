@@ -1,7 +1,8 @@
 import React, { useState, useMemo } from 'react';
-import { View, Text, TextInput, TouchableOpacity, ScrollView, StatusBar, Image, Alert, Modal } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, ScrollView, StatusBar, Image, Alert, Modal, Platform } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Menu, DoorOpen, Users, ShoppingCart, Image as ImageIcon, Calendar } from 'lucide-react-native';
+import * as ImagePicker from 'expo-image-picker';
 import '../../../global.css';
 
 // TODO: Replace with API call - This should fetch the item by ID
@@ -145,6 +146,31 @@ export default function EditStockScreen() {
   ];
   const statusOptions = ['Available', 'Delivered', 'Cancelled'];
 
+  const pickImage = async () => {
+    // Request permissions
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert(
+        'Permission Required',
+        'Sorry, we need camera roll permissions to select an image!'
+      );
+      return;
+    }
+
+    // Launch image picker
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [4, 3],
+      quality: 0.8,
+    });
+
+    if (!result.canceled && result.assets && result.assets.length > 0) {
+      // Store the image URI - this will persist in state
+      setBlindboxImage(result.assets[0].uri);
+    }
+  };
+
   const handleSave = () => {
     // TODO: Handle save action with API call
     console.log('Saving stock item:', {
@@ -201,10 +227,7 @@ export default function EditStockScreen() {
               minHeight: 200,
               borderStyle: blindboxImage ? 'solid' : 'dashed',
             }}
-            onPress={() => {
-              // TODO: Handle image picker
-              console.log('Open image picker');
-            }}
+            onPress={pickImage}
           >
             {blindboxImage ? (
               <Image 

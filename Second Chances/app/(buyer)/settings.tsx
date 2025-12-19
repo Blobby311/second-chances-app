@@ -4,7 +4,7 @@ import { useRouter, useFocusEffect } from 'expo-router';
 import { ArrowLeft, Pencil, ChevronRight, User, Bell, ShieldCheck, Info } from 'lucide-react-native';
 import '../../global.css';
 import { API_URL } from '../../config/api';
-import { getAuthToken, clearAuthToken } from '../../config/auth';
+import { getAuthToken, clearAuthToken, setPreferredRole } from '../../config/auth';
 
 const APP_VERSION = 'v1.0.2';
 
@@ -46,9 +46,9 @@ export default function SettingsScreen() {
         setOrderUpdates(data.settings.emailNotifications ?? true);
         setPromoUpdates(data.settings.pushNotifications ?? false);
       }
-      if (data.roles?.includes('seller')) {
-        setIsSeller(true);
-      }
+      // On buyer settings screen, user is always in buyer view
+      // isSeller should be false unless they explicitly switch
+      setIsSeller(false);
     } catch (error) {
       console.error('Error fetching profile:', error);
       Alert.alert('Error', 'Failed to load profile');
@@ -450,11 +450,22 @@ export default function SettingsScreen() {
           }}
         >
           <Text
-            className="text-lg font-bold mb-3"
+            className="text-lg font-bold mb-2"
             style={{ color: '#2C4A34', fontFamily: 'System' }}
           >
             Switch role
           </Text>
+          <View 
+            className="mb-3 px-3 py-2 rounded-xl"
+            style={{ backgroundColor: '#2C4A34' }}
+          >
+            <Text
+              className="text-sm font-semibold"
+              style={{ color: '#E8F3E0', fontFamily: 'System' }}
+            >
+              {isSeller ? 'You are currently in Seller role' : 'You are currently in Buyer role'}
+            </Text>
+          </View>
           <Text
             className="text-xs mb-3"
             style={{ color: '#6b7280', fontFamily: 'System' }}
@@ -466,8 +477,42 @@ export default function SettingsScreen() {
             <TouchableOpacity
               onPress={() => {
                 if (!isSeller) {
-                  setIsSeller(true);
-                  router.replace('/(seller)/dashboard');
+                  Alert.alert(
+                    'Switch to Seller View',
+                    'Are you sure you want to switch to Seller view? Your buyer data (orders, favorites) will remain separate and unchanged.',
+                    [
+                      { text: 'Cancel', style: 'cancel' },
+                      {
+                        text: 'Switch',
+                        style: 'destructive',
+                        onPress: async () => {
+                          try {
+                            const token = getAuthToken();
+                            if (token) {
+                              // Add seller role to user account
+                              await fetch(`${API_URL}/api/user/add-role`, {
+                                method: 'POST',
+                                headers: {
+                                  'Content-Type': 'application/json',
+                                  Authorization: `Bearer ${token}`,
+                                },
+                                body: JSON.stringify({ role: 'seller' }),
+                              });
+                            }
+                            setIsSeller(true);
+                            await setPreferredRole('seller');
+                            router.replace('/(seller)/dashboard');
+                          } catch (error) {
+                            console.error('Error adding role:', error);
+                            // Still switch even if API call fails
+                            setIsSeller(true);
+                            await setPreferredRole('seller');
+                            router.replace('/(seller)/dashboard');
+                          }
+                        },
+                      },
+                    ]
+                  );
                 }
               }}
               className="flex-1 py-3 rounded-2xl"
@@ -490,8 +535,42 @@ export default function SettingsScreen() {
             <TouchableOpacity
               onPress={() => {
                 if (isSeller) {
-                  setIsSeller(false);
-                  router.replace('/(buyer)/home');
+                  Alert.alert(
+                    'Switch to Buyer View',
+                    'Are you sure you want to switch to Buyer view? Your seller data (products, stock) will remain separate and unchanged.',
+                    [
+                      { text: 'Cancel', style: 'cancel' },
+                      {
+                        text: 'Switch',
+                        style: 'destructive',
+                        onPress: async () => {
+                          try {
+                            const token = getAuthToken();
+                            if (token) {
+                              // Add buyer role to user account
+                              await fetch(`${API_URL}/api/user/add-role`, {
+                                method: 'POST',
+                                headers: {
+                                  'Content-Type': 'application/json',
+                                  Authorization: `Bearer ${token}`,
+                                },
+                                body: JSON.stringify({ role: 'buyer' }),
+                              });
+                            }
+                            setIsSeller(false);
+                            await setPreferredRole('buyer');
+                            router.replace('/(buyer)/home');
+                          } catch (error) {
+                            console.error('Error adding role:', error);
+                            // Still switch even if API call fails
+                            setIsSeller(false);
+                            await setPreferredRole('buyer');
+                            router.replace('/(buyer)/home');
+                          }
+                        },
+                      },
+                    ]
+                  );
                 }
               }}
               className="flex-1 py-3 rounded-2xl"
