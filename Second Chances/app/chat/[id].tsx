@@ -76,7 +76,11 @@ interface Message {
 }
 
 export default function ChatScreen() {
-  const { id: chatId, orderId } = useLocalSearchParams<{ id: string; orderId?: string }>();
+  const { id: chatId, orderId, name: initialName } = useLocalSearchParams<{
+    id: string;
+    orderId?: string;
+    name?: string;
+  }>();
   const router = useRouter();
   
   const [messages, setMessages] = useState<Message[]>([]);
@@ -84,7 +88,11 @@ export default function ChatScreen() {
   const [isComplete, setIsComplete] = useState(false);
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
-  const [chatPartner, setChatPartner] = useState<{ name: string; avatar: string; online: boolean } | null>(null);
+  const [chatPartner, setChatPartner] = useState<{
+    name: string;
+    avatar: string;
+    online: boolean;
+  } | null>(initialName ? { name: initialName as string, avatar: '', online: false } : null);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [isSeller, setIsSeller] = useState<boolean>(false);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
@@ -112,9 +120,40 @@ export default function ChatScreen() {
 
   // Load chat messages
   const loadMessages = useCallback(async () => {
+    // Normalise some demo IDs so they map to our sample chat dataset
+    let effectiveChatId = chatId === 'b1' ? 'sample-b1' : chatId === 'b2' ? 'sample-b2' : chatId;
+
+    // Also normalise demo seller IDs to their corresponding sample chat IDs
+    if (effectiveChatId === 'demo-seller-1') effectiveChatId = 'sample-1';
+    else if (effectiveChatId === 'demo-seller-2') effectiveChatId = 'sample-2';
+    else if (effectiveChatId === 'demo-seller-3') effectiveChatId = 'sample-b1';
+    else if (effectiveChatId === 'demo-seller-4') effectiveChatId = 'sample-b2';
+
     try {
+      if (!effectiveChatId) {
+        setLoading(false);
+        return;
+      }
+
+      // Handle sample/demo chats fully on the client without backend calls
+      if (effectiveChatId.startsWith('sample-')) {
+        const sampleData = SAMPLE_CHAT_DATA[effectiveChatId as keyof typeof SAMPLE_CHAT_DATA];
+        if (sampleData) {
+          // If a name was passed via navigation (e.g. from a seller profile like "Organic Neighbor"),
+          // prefer that for the chat header instead of the generic sample name.
+          const nameFromNav = (initialName as string) || sampleData.partner.name;
+          setChatPartner({ ...sampleData.partner, name: nameFromNav, online: false });
+          setMessages(sampleData.messages);
+        } else {
+          setChatPartner({ name: (initialName as string) || 'Sample User', avatar: '', online: false });
+          setMessages([]);
+        }
+        setLoading(false);
+        return;
+      }
+
       const token = getAuthToken();
-      if (!token || !chatId) {
+      if (!token) {
         setLoading(false);
         return;
       }
@@ -135,7 +174,7 @@ export default function ChatScreen() {
       }
 
       // Get chat messages first (this will also validate the chat exists and user has access)
-      const response = await fetch(`${API_URL}/api/chat/${chatId}/messages`, {
+      const response = await fetch(`${API_URL}/api/chats/${effectiveChatId}/messages`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -146,8 +185,8 @@ export default function ChatScreen() {
       // Handle 404 - check if it's a sample chat, otherwise it's a real chat that needs to be created
       if (response.status === 404) {
         // --- UPDATED LOGIC ---
-        if (chatId.startsWith('sample-')) {
-          const sampleData = SAMPLE_CHAT_DATA[chatId as keyof typeof SAMPLE_CHAT_DATA];
+        if (effectiveChatId.startsWith('sample-')) {
+          const sampleData = SAMPLE_CHAT_DATA[effectiveChatId as keyof typeof SAMPLE_CHAT_DATA];
           if (sampleData) {
             setChatPartner({ ...sampleData.partner, online: false });
             setMessages(sampleData.messages);
@@ -158,7 +197,7 @@ export default function ChatScreen() {
         } else {
           console.log('New chat (404) - chat will be created when first message is sent');
           setMessages([]);
-          setChatPartner({ name: 'User', avatar: '', online: false });
+          setChatPartner((prev) => prev || { name: (initialName as string) || 'User', avatar: '', online: false });
         }
         setLoading(false);
         return;
@@ -179,7 +218,7 @@ export default function ChatScreen() {
       let chatInfo = null;
       if (response.ok) {
         try {
-          const chatListResponse = await fetch(`${API_URL}/api/chat?role=buyer`, {
+          const chatListResponse = await fetch(`${API_URL}/api/chats?role=buyer`, {
             method: 'GET',
             headers: {
               'Content-Type': 'application/json',
@@ -194,7 +233,7 @@ export default function ChatScreen() {
 
           // If not found in buyer list, try seller list
           if (!chatInfo) {
-            const sellerChatListResponse = await fetch(`${API_URL}/api/chat?role=seller`, {
+            const sellerChatListResponse = await fetch(`${API_URL}/api/chats?role=seller`, {
               method: 'GET',
               headers: {
                 'Content-Type': 'application/json',
@@ -252,8 +291,15 @@ export default function ChatScreen() {
     } catch (error: any) {
       console.error('Error loading messages:', error);
       // --- UPDATED FALLBACK LOGIC ---
-      if (chatId.startsWith('sample-')) {
-        const sampleData = SAMPLE_CHAT_DATA[chatId as keyof typeof SAMPLE_CHAT_DATA];
+      let effectiveChatIdFallback = chatId === 'b1' ? 'sample-b1' : chatId === 'b2' ? 'sample-b2' : chatId;
+
+      if (effectiveChatIdFallback === 'demo-seller-1') effectiveChatIdFallback = 'sample-1';
+      else if (effectiveChatIdFallback === 'demo-seller-2') effectiveChatIdFallback = 'sample-2';
+      else if (effectiveChatIdFallback === 'demo-seller-3') effectiveChatIdFallback = 'sample-b1';
+      else if (effectiveChatIdFallback === 'demo-seller-4') effectiveChatIdFallback = 'sample-b2';
+
+      if (effectiveChatIdFallback && effectiveChatIdFallback.startsWith('sample-')) {
+        const sampleData = SAMPLE_CHAT_DATA[effectiveChatIdFallback as keyof typeof SAMPLE_CHAT_DATA];
         if (sampleData) {
           setChatPartner({ ...sampleData.partner, online: false });
           setMessages(sampleData.messages);
@@ -263,7 +309,7 @@ export default function ChatScreen() {
     } finally {
       setLoading(false);
     }
-  }, [chatId]);
+  }, [chatId, initialName]);
 
   // Load messages on mount and when screen is focused
   useEffect(() => {
@@ -312,7 +358,15 @@ export default function ChatScreen() {
   const sendMessage = async (text: string) => {
     if (!text.trim() || sending || !chatId) return;
 
-    if (chatId.startsWith('sample-')) {
+    let effectiveChatId = chatId === 'b1' ? 'sample-b1' : chatId === 'b2' ? 'sample-b2' : chatId;
+
+    // Also normalise demo seller IDs to their corresponding sample chat IDs
+    if (effectiveChatId === 'demo-seller-1') effectiveChatId = 'sample-1';
+    else if (effectiveChatId === 'demo-seller-2') effectiveChatId = 'sample-2';
+    else if (effectiveChatId === 'demo-seller-3') effectiveChatId = 'sample-b1';
+    else if (effectiveChatId === 'demo-seller-4') effectiveChatId = 'sample-b2';
+
+    if (effectiveChatId.startsWith('sample-')) {
       Alert.alert(
         'Demo Chat',
         'This is a sample chat for demonstration. To send real messages, please start a chat from a product or order.',
@@ -341,7 +395,7 @@ export default function ChatScreen() {
         throw new Error('Not authenticated');
       }
 
-      const response = await fetch(`${API_URL}/api/chat/${chatId}/messages`, {
+      const response = await fetch(`${API_URL}/api/chats/${effectiveChatId}/messages`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -376,7 +430,7 @@ export default function ChatScreen() {
   };
 
   const chatPartnerDetails = chatPartner || {
-    name: 'User',
+    name: (initialName as string) || 'User',
     avatar: '',
     online: false,
   };

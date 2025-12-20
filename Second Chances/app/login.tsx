@@ -45,26 +45,53 @@ export default function LoginScreen() {
       setLoading(true);
       setError('');
 
-      const response = await fetch(`${API_URL}/api/auth/login`, {
+      const loginUrl = `${API_URL}/api/auth/login`;
+      console.log('Attempting login to:', loginUrl);
+
+      // Create timeout abort controller
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+
+      const response = await fetch(loginUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ email: email.trim(), password }),
+        signal: controller.signal,
+      }).catch((fetchError: any) => {
+        clearTimeout(timeoutId);
+        console.error('Fetch error details:', {
+          name: fetchError?.name,
+          message: fetchError?.message,
+          code: fetchError?.code,
+          url: loginUrl,
+        });
+        throw fetchError;
       });
 
-      const data = await response.json();
+      clearTimeout(timeoutId);
 
+      // Check if response is ok before trying to parse JSON
       if (!response.ok) {
-        const message = data?.errors?.[0]?.msg || data?.error || 'Login failed';
+        let errorMessage = 'Login failed';
+        try {
+          const errorData = await response.json();
+          errorMessage = errorData?.errors?.[0]?.msg || errorData?.error || `Server error: ${response.status}`;
+        } catch (parseError) {
+          errorMessage = `Server error: ${response.status} ${response.statusText}`;
+        }
+        
         // Show user-friendly message
-        if (message.toLowerCase().includes('invalid') || message.toLowerCase().includes('credentials')) {
+        if (errorMessage.toLowerCase().includes('invalid') || errorMessage.toLowerCase().includes('credentials')) {
           setError('Invalid email or password');
         } else {
-          setError(message);
+          setError(errorMessage);
         }
         return;
       }
+
+      const data = await response.json();
 
       // Validate that we got a token and user data
       if (!data.token || !data.user) {
@@ -83,7 +110,19 @@ export default function LoginScreen() {
       }
     } catch (err: any) {
       console.error('Login error:', err);
-      setError(err?.message || 'Unable to reach server. Please try again.');
+      
+      // Provide more specific error messages
+      let errorMessage = 'Unable to reach server. Please try again.';
+      
+      if (err?.name === 'AbortError') {
+        errorMessage = 'Request timed out after 30 seconds. The backend may be slow to respond. Please try again.';
+      } else if (err?.message?.includes('Network request failed')) {
+        errorMessage = `Cannot connect to server at ${API_URL}.\n\nPlease check:\n• Your internet connection\n• If backend is accessible\n• Try the debug screen to test connection`;
+      } else if (err?.message) {
+        errorMessage = err.message;
+      }
+      
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }

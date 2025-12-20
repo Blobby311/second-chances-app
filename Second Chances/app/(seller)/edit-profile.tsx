@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StatusBar, Image, Alert } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StatusBar, Image, Alert, ActivityIndicator } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { ArrowLeft } from 'lucide-react-native';
 import '../../global.css';
@@ -20,6 +20,7 @@ export default function EditProfileScreen() {
   const [fullName, setFullName] = useState(INITIAL_USER_DATA.fullName);
   const [email, setEmail] = useState(INITIAL_USER_DATA.email);
   const [phone, setPhone] = useState(INITIAL_USER_DATA.phone);
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     if (params.name) setName(params.name as string);
@@ -28,9 +29,14 @@ export default function EditProfileScreen() {
     if (params.phone) setPhone(params.phone as string);
   }, [params]);
 
-  const handleSave = () => {
-    // TODO: Call API to save profile changes
-    router.back();
+  const handleSave = async () => {
+    setLoading(true);
+    try {
+      // TODO: Call API to save profile changes
+      router.back();
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleCancel = () => {

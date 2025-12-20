@@ -113,7 +113,7 @@ router.get('/:id/messages', authenticate, async (req: AuthRequest, res: Response
         return res.json(messages);
       } catch (err) {
         // Not a valid user ID, return 404
-        return res.status(404).json({ error: 'Chat not found' });
+      return res.status(404).json({ error: 'Chat not found' });
       }
     }
 
@@ -164,11 +164,11 @@ router.post(
 
           if (!chat) {
             // Create new chat - current user is buyer, other is seller
-            chat = new Chat({
+        chat = new Chat({
               buyer: currentUserId,
               seller: otherUserId,
-            });
-            await chat.save();
+        });
+        await chat.save();
           }
         } catch (err) {
           return res.status(404).json({ error: 'Chat not found' });

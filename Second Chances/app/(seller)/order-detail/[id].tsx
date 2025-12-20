@@ -146,6 +146,16 @@ const getOrderById = (id: string) => {
   return allOrders.find(order => order.id === id) || allOrders[0];
 };
 
+// Map dummy buyer profile IDs to sample chat IDs so demo flows use local chats
+const DEMO_BUYER_CHAT_IDS: Record<string, string> = {
+  b1: 'sample-b1',
+  b2: 'sample-b2',
+  b3: 'sample-b1',
+  b4: 'sample-b2',
+  b5: 'sample-b1',
+  b6: 'sample-b2',
+};
+
 export default function OrderDetailScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -211,7 +221,9 @@ export default function OrderDetailScreen() {
   };
 
   const handleContactBuyer = () => {
-    router.push(`/chat/${order.buyer.profileId}?orderId=${order.id}`);
+    const profileId = order.buyer.profileId;
+    const targetChatId = DEMO_BUYER_CHAT_IDS[profileId] || profileId;
+    router.push(`/chat/${encodeURIComponent(targetChatId)}?orderId=${order.id}&name=${encodeURIComponent(order.buyer.name)}`);
   };
 
   const handleViewProfile = () => {

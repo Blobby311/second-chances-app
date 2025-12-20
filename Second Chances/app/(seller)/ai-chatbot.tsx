@@ -18,60 +18,60 @@ export default function AIChatbotScreen() {
 
   // Load chat history function
   const loadChatHistory = useCallback(async () => {
-    try {
-      const token = getAuthToken();
-      if (!token) {
-        // If not authenticated, show welcome message
-        setMessages([{
-          id: '1',
-          sender: 'bot',
-          content: 'Hello! I\'m your AI Plant Assistant powered by GPT OSS 120B. Ask me anything about growing plants, sustainable food practices, tips, and tricks!',
-          timestamp: 'Now',
-        }]);
-        setLoadingHistory(false);
-        return;
-      }
+      try {
+        const token = getAuthToken();
+        if (!token) {
+          // If not authenticated, show welcome message
+          setMessages([{
+            id: '1',
+            sender: 'bot',
+            content: 'Hello! I\'m your AI Plant Assistant powered by GPT OSS 120B. Ask me anything about growing plants, sustainable food practices, tips, and tricks!',
+            timestamp: 'Now',
+          }]);
+          setLoadingHistory(false);
+          return;
+        }
 
       const response = await fetch(`${API_URL}/api/ai/chat/history?role=seller`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-      });
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+        });
 
-      const data = await response.json();
+        const data = await response.json();
 
-      if (response.ok && Array.isArray(data) && data.length > 0) {
-        // Load existing messages
-        const formattedMessages = data.map((msg: any) => ({
-          id: msg.id,
-          sender: msg.sender,
-          content: msg.content,
-          timestamp: formatTimestamp(msg.timestamp),
-        }));
-        setMessages(formattedMessages);
-      } else {
-        // No history, show welcome message
+        if (response.ok && Array.isArray(data) && data.length > 0) {
+          // Load existing messages
+          const formattedMessages = data.map((msg: any) => ({
+            id: msg.id,
+            sender: msg.sender,
+            content: msg.content,
+            timestamp: formatTimestamp(msg.timestamp),
+          }));
+          setMessages(formattedMessages);
+        } else {
+          // No history, show welcome message
+          setMessages([{
+            id: '1',
+            sender: 'bot',
+            content: 'Hello! I\'m your AI Plant Assistant powered by GPT OSS 120B. Ask me anything about growing plants, sustainable food practices, tips, and tricks!',
+            timestamp: 'Now',
+          }]);
+        }
+      } catch (error) {
+        console.error('Error loading chat history:', error);
+        // Show welcome message on error
         setMessages([{
           id: '1',
           sender: 'bot',
           content: 'Hello! I\'m your AI Plant Assistant powered by GPT OSS 120B. Ask me anything about growing plants, sustainable food practices, tips, and tricks!',
           timestamp: 'Now',
         }]);
+      } finally {
+        setLoadingHistory(false);
       }
-    } catch (error) {
-      console.error('Error loading chat history:', error);
-      // Show welcome message on error
-      setMessages([{
-        id: '1',
-        sender: 'bot',
-        content: 'Hello! I\'m your AI Plant Assistant powered by GPT OSS 120B. Ask me anything about growing plants, sustainable food practices, tips, and tricks!',
-        timestamp: 'Now',
-      }]);
-    } finally {
-      setLoadingHistory(false);
-    }
   }, []);
 
   // Load chat history on mount

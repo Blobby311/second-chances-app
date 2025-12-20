@@ -1,101 +1,113 @@
-import React, { useState, useMemo } from 'react';
-import { View, Text, TextInput, TouchableOpacity, ScrollView, StatusBar, Image, Alert, Modal, Platform } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, TextInput, TouchableOpacity, ScrollView, StatusBar, Image, Alert, Modal, Platform, ActivityIndicator } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Menu, DoorOpen, Users, ShoppingCart, Image as ImageIcon, Calendar } from 'lucide-react-native';
 import * as ImagePicker from 'expo-image-picker';
 import '../../../global.css';
-
-// TODO: Replace with API call - This should fetch the item by ID
-const getStockItemById = (id: string) => {
-  // Mock data - in real app, fetch from API
-  // This should match the STOCK_DATA from stock.tsx
-  const allItems = [
-    {
-      id: '1',
-      name: 'Rescued Veggie Box',
-      category: 'Vegetables',
-      price: 'RM10',
-      bestBefore: '01-09-25',
-      status: 'Available',
-      deliveryMethod: 'Grab',
-      imageUrl: 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQRQEytqdym2soe7nH5Tqqe4X1GvyNbDbUs0A&s',
-      description: 'Fresh mixed vegetables',
-    },
-    {
-      id: '2',
-      name: 'Sunrise Fruit Crate',
-      category: 'Fruits',
-      price: 'RM15',
-      bestBefore: '02-09-25',
-      status: 'Available',
-      deliveryMethod: 'Doorstep',
-      imageUrl: 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRSimGyJxyM2BpGcrcv9_b_lskXGFHA_TPoOw&s',
-      description: 'Fresh seasonal fruits',
-    },
-    {
-      id: '3',
-      name: 'Organic Veg Rescue',
-      category: 'Vegetables',
-      price: 'RM12',
-      bestBefore: '03-09-25',
-      status: 'Available',
-      deliveryMethod: 'Self Pick-Up',
-      imageUrl: 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcS0NTZmv6zIanNf621NF_dJQNoCb4eYQNAAzQ&s',
-      description: 'Organic vegetable mix',
-    },
-    {
-      id: '4',
-      name: 'Neighbor\'s Free Gift',
-      category: 'Mix',
-      price: 'RM0',
-      bestBefore: '01-09-25',
-      status: 'Delivered',
-      deliveryMethod: 'Grab',
-      imageUrl: 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTmAps3JJfGUb6r7bvZZL6zHjAzgxvMvD2Ijg&s',
-      description: 'Community free gift',
-    },
-    {
-      id: '5',
-      name: 'Fresh Fruit Basket',
-      category: 'Fruits',
-      price: 'RM18',
-      bestBefore: '02-09-25',
-      status: 'Delivered',
-      deliveryMethod: 'Doorstep',
-      imageUrl: 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQRQEytqdym2soe7nH5Tqqe4X1GvyNbDbUs0A&s',
-      description: 'Fresh fruit selection',
-    },
-    {
-      id: '6',
-      name: 'Mixed Veggie Box',
-      category: 'Vegetables',
-      price: 'RM10',
-      bestBefore: '01-09-25',
-      status: 'Cancelled',
-      deliveryMethod: null,
-      imageUrl: 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRSimGyJxyM2BpGcrcv9_b_lskXGFHA_TPoOw&s',
-      description: 'Mixed vegetable box',
-    },
-  ];
-  return allItems.find(item => item.id === id) || allItems[0];
-};
+import { API_URL } from '../../../config/api';
+import { getAuthToken } from '../../../config/auth';
 
 export default function EditStockScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
-  const stockItem = useMemo(() => getStockItemById(id), [id]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
 
-  const [blindboxName, setBlindboxName] = useState(stockItem.name);
-  const [blindboxImage, setBlindboxImage] = useState<string | null>(stockItem.imageUrl);
-  const [description, setDescription] = useState(stockItem.description || '');
-  const [selectedCategory, setSelectedCategory] = useState(stockItem.category);
-  const [priceValue, setPriceValue] = useState(stockItem.price.replace('RM', '').trim());
-  const [selectedPrice, setSelectedPrice] = useState(priceValue === '0' ? 'Free' : priceValue === '5' ? 'RM5' : priceValue === '10' ? 'RM10' : 'Custom');
-  const [customPrice, setCustomPrice] = useState(selectedPrice === 'Custom' ? priceValue : '');
-  const [selectedDelivery, setSelectedDelivery] = useState<string | null>(stockItem.deliveryMethod);
-  const [selectedStatus, setSelectedStatus] = useState(stockItem.status);
-  const [bestBefore, setBestBefore] = useState(stockItem.bestBefore);
+  const [blindboxName, setBlindboxName] = useState('');
+  const [blindboxImage, setBlindboxImage] = useState<string | null>(null);
+  const [originalImageUrl, setOriginalImageUrl] = useState<string | null>(null);
+  const [description, setDescription] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState('Fruits');
+  const [selectedPrice, setSelectedPrice] = useState('Free');
+  const [customPrice, setCustomPrice] = useState('');
+  const [selectedDelivery, setSelectedDelivery] = useState<string | null>(null);
+  const [selectedStatus, setSelectedStatus] = useState('Available');
+  const [bestBefore, setBestBefore] = useState('');
   const [showDatePicker, setShowDatePicker] = useState(false);
+
+  // Fetch product data on load
+  useEffect(() => {
+    const fetchProduct = async () => {
+      try {
+        setLoading(true);
+        const token = getAuthToken();
+        if (!token) {
+          Alert.alert('Authentication Error', 'Please log in again.');
+          router.replace('/login');
+          return;
+        }
+
+        const response = await fetch(`${API_URL}/api/products/${id}`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to load product');
+        }
+
+        const product = await response.json();
+        
+        // Format image URL
+        let imageUrl = product.imageUrl || '';
+        if (imageUrl && !imageUrl.startsWith('http')) {
+          imageUrl = `${API_URL}${imageUrl}`;
+        }
+        
+        // Set state from product data
+        setBlindboxName(product.name || '');
+        setDescription(product.description || '');
+        setSelectedCategory(product.category === 'Vegetables' ? 'Vegetable' : product.category || 'Fruits');
+        setOriginalImageUrl(imageUrl);
+        setBlindboxImage(imageUrl);
+        
+        // Set price
+        const price = product.price || 0;
+        if (price === 0) {
+          setSelectedPrice('Free');
+        } else if (price === 5) {
+          setSelectedPrice('RM5');
+        } else if (price === 10) {
+          setSelectedPrice('RM10');
+        } else {
+          setSelectedPrice('Custom');
+          setCustomPrice(price.toString());
+        }
+        
+        setSelectedDelivery(product.deliveryMethod || null);
+        
+        // Map backend status to frontend status
+        let status = 'Available';
+        if (product.status === 'delivered') status = 'Delivered';
+        else if (product.status === 'cancelled') status = 'Cancelled';
+        setSelectedStatus(status);
+        
+        // Format best before date
+        if (product.bestBefore) {
+          const date = new Date(product.bestBefore);
+          const day = String(date.getDate()).padStart(2, '0');
+          const month = String(date.getMonth() + 1).padStart(2, '0');
+          const year = String(date.getFullYear()).slice(-2);
+          const dateStr = `${day}-${month}-${year}`;
+          setBestBefore(dateStr);
+          // Update date picker state
+          setSelectedDay(date.getDate());
+          setSelectedMonth(date.getMonth() + 1);
+          setSelectedYear(date.getFullYear());
+        }
+      } catch (error: any) {
+        console.error('Error fetching product:', error);
+        Alert.alert('Error', 'Failed to load product. Please try again.');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (id) {
+      fetchProduct();
+    }
+  }, [id]);
   
   // Parse current date or use today
   const parseDate = (dateString: string) => {
@@ -108,7 +120,8 @@ export default function EditStockScreen() {
     return { day: today.getDate(), month: today.getMonth() + 1, year: today.getFullYear() };
   };
 
-  const initialDate = parseDate(stockItem.bestBefore);
+  // Parse date from bestBefore string or use today
+  const initialDate = bestBefore ? parseDate(bestBefore) : parseDate('');
   const [selectedDay, setSelectedDay] = useState(initialDate.day);
   const [selectedMonth, setSelectedMonth] = useState(initialDate.month);
   const [selectedYear, setSelectedYear] = useState(initialDate.year);
@@ -171,24 +184,169 @@ export default function EditStockScreen() {
     }
   };
 
-  const handleSave = () => {
-    // TODO: Handle save action with API call
-    console.log('Saving stock item:', {
-      id,
-      blindboxName,
-      blindboxImage,
-      description,
-      selectedCategory,
-      selectedPrice,
-      customPrice,
-      selectedDelivery,
-      selectedStatus,
-      bestBefore,
-    });
-    Alert.alert('Success', 'Stock item updated successfully', [
-      { text: 'OK', onPress: () => router.back() },
-    ]);
+  const handleSave = async () => {
+    // Validation
+    if (!blindboxName || !blindboxName.trim()) {
+      Alert.alert('Name Required', 'Please enter a name for your blindbox.');
+      return;
+    }
+
+    if (!description || !description.trim()) {
+      Alert.alert('Description Required', 'Please add a description for your blindbox.');
+      return;
+    }
+
+    if (!selectedDelivery) {
+      Alert.alert('Delivery Method Required', 'Please select a delivery method.');
+      return;
+    }
+
+    try {
+      setSaving(true);
+      const token = getAuthToken();
+      if (!token) {
+        Alert.alert('Authentication Required', 'Please log in again.');
+        router.replace('/login');
+        return;
+      }
+
+      // Calculate price
+      let price = 0;
+      if (selectedPrice === 'Free') {
+        price = 0;
+      } else if (selectedPrice === 'RM5') {
+        price = 5;
+      } else if (selectedPrice === 'RM10') {
+        price = 10;
+      } else if (selectedPrice === 'Custom') {
+        const customPriceNum = parseFloat(customPrice);
+        if (isNaN(customPriceNum) || customPriceNum < 0) {
+          Alert.alert('Invalid Price', 'Please enter a valid custom price.');
+          return;
+        }
+        price = customPriceNum;
+      }
+
+      // Map category to backend format
+      let category = selectedCategory;
+      if (selectedCategory === 'Vegetable') {
+        category = 'Vegetables';
+      }
+
+      // Map delivery method (handle 'Grab' as 'Doorstep')
+      let deliveryMethod = selectedDelivery;
+      if (selectedDelivery === 'Grab') {
+        deliveryMethod = 'Doorstep';
+      }
+
+      // Map status to backend format
+      let status = 'to-ship';
+      if (selectedStatus === 'Delivered') {
+        status = 'delivered';
+      } else if (selectedStatus === 'Cancelled') {
+        status = 'cancelled';
+      }
+
+      // Parse best before date
+      let bestBeforeDate: Date | undefined;
+      if (bestBefore) {
+        const [day, month, year] = bestBefore.split('-');
+        const fullYear = parseInt(year) < 50 ? 2000 + parseInt(year) : 1900 + parseInt(year);
+        bestBeforeDate = new Date(fullYear, parseInt(month) - 1, parseInt(day));
+      }
+
+      // Create FormData if image was changed, otherwise use JSON
+      const hasNewImage = blindboxImage && blindboxImage !== originalImageUrl && blindboxImage.startsWith('file://');
+      
+      if (hasNewImage) {
+        // Update with new image
+        const formData = new FormData();
+        const imageUri = blindboxImage;
+        const filename = imageUri.split('/').pop() || 'image.jpg';
+        const match = /\.([a-zA-Z0-9]+)$/i.exec(filename);
+        const type = match ? `image/${match[1]}` : 'image/jpeg';
+        
+        formData.append('image', {
+          uri: Platform.OS === 'android' ? imageUri : imageUri.replace('file://', ''),
+          name: filename,
+          type: type,
+        } as any);
+
+        formData.append('name', blindboxName.trim());
+        formData.append('description', description.trim());
+        formData.append('category', category);
+        formData.append('price', price.toString());
+        formData.append('deliveryMethod', deliveryMethod);
+        formData.append('status', status);
+        if (bestBeforeDate) {
+          formData.append('bestBefore', bestBeforeDate.toISOString());
+        }
+
+        const response = await fetch(`${API_URL}/api/products/${id}`, {
+          method: 'PUT',
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+          body: formData,
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          const errorMessage = data?.errors?.[0]?.msg || data?.error || 'Failed to update blindbox';
+          Alert.alert('Error', errorMessage);
+          return;
+        }
+
+        Alert.alert('Success', 'Blindbox updated successfully!', [
+          { text: 'OK', onPress: () => router.back() },
+        ]);
+      } else {
+        // Update without changing image
+        const response = await fetch(`${API_URL}/api/products/${id}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            name: blindboxName.trim(),
+            description: description.trim(),
+            category,
+            price,
+            deliveryMethod,
+            status,
+            bestBefore: bestBeforeDate?.toISOString(),
+          }),
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          const errorMessage = data?.errors?.[0]?.msg || data?.error || 'Failed to update blindbox';
+          Alert.alert('Error', errorMessage);
+          return;
+        }
+
+        Alert.alert('Success', 'Blindbox updated successfully!', [
+          { text: 'OK', onPress: () => router.back() },
+        ]);
+      }
+    } catch (error: any) {
+      console.error('Error updating blindbox:', error);
+      Alert.alert('Error', 'Failed to update blindbox. Please try again.');
+    } finally {
+      setSaving(false);
+    }
   };
+
+  if (loading) {
+    return (
+      <View className="flex-1 items-center justify-center" style={{ backgroundColor: '#365441' }}>
+        <ActivityIndicator size="large" color="#E8F3E0" />
+      </View>
+    );
+  }
 
   return (
     <View className="flex-1" style={{ backgroundColor: '#365441' }}>
@@ -673,12 +831,17 @@ export default function EditStockScreen() {
       <View className="px-4 pb-8 pt-4" style={{ backgroundColor: '#365441' }}>
         <TouchableOpacity 
           className="py-4 rounded-3xl items-center"
-          style={{ backgroundColor: '#C85E51' }}
+          style={{ backgroundColor: '#C85E51', opacity: saving ? 0.7 : 1 }}
           onPress={handleSave}
+          disabled={saving || loading}
         >
-          <Text className="text-white text-lg font-bold uppercase" style={{ fontFamily: 'System' }}>
-            Save Changes
-          </Text>
+          {saving ? (
+            <ActivityIndicator color="#ffffff" />
+          ) : (
+            <Text className="text-white text-lg font-bold uppercase" style={{ fontFamily: 'System' }}>
+              Save Changes
+            </Text>
+          )}
         </TouchableOpacity>
       </View>
     </View>

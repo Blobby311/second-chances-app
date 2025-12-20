@@ -40,7 +40,7 @@ const OrderSchema = new Schema<IOrder>(
 );
 
 // Generate order ID before saving
-OrderSchema.pre('save', async function (next) {
+OrderSchema.pre('validate', async function (next) {
   if (!this.orderId) {
     const prefix = ['XM', 'YM', 'ZN'][Math.floor(Math.random() * 3)];
     const number = Math.floor(Math.random() * 90000) + 10000;

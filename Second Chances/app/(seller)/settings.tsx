@@ -382,9 +382,9 @@ export default function SettingsScreen() {
                             } catch (error) {
                               console.error('Error adding role:', error);
                               // Still switch even if API call fails
-                              setIsSeller(true);
+                    setIsSeller(true);
                               await setPreferredRole('seller');
-                              router.replace('/(seller)/dashboard');
+                    router.replace('/(seller)/dashboard');
                             }
                           },
                         },
@@ -440,9 +440,9 @@ export default function SettingsScreen() {
                             } catch (error) {
                               console.error('Error adding role:', error);
                               // Still switch even if API call fails
-                              setIsSeller(false);
+                    setIsSeller(false);
                               await setPreferredRole('buyer');
-                              router.replace('/(buyer)/home');
+                    router.replace('/(buyer)/home');
                             }
                           },
                         },

@@ -3,6 +3,9 @@ import { View, Text, TouchableOpacity, StatusBar, Alert, Switch, ScrollView } fr
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Star, Gift } from 'lucide-react-native';
 import '../global.css';
+import { API_URL } from '../config/api';
+import { getAuthToken } from '../config/auth';
+import { DEMO_ORDERS } from './(buyer)/my-orders';
 
 // TODO: Get from buyer rewards/points API
 const USER_POINTS = 345;
@@ -11,12 +14,21 @@ const AVAILABLE_REWARDS = [
   { id: 'r2', name: '10% Discount', discount: 10, pointsCost: 200 },
 ];
 
+// Map canonical demo seller IDs to their corresponding sample chat IDs
+const DEMO_SELLER_CHAT_IDS: Record<string, string> = {
+  'demo-seller-1': 'sample-1',
+  'demo-seller-2': 'sample-2',
+  'demo-seller-3': 'sample-b1',
+  'demo-seller-4': 'sample-b2',
+};
+
 export default function CheckoutScreen() {
-  const { title, price, isFree = 'false', sellerId = 's1', id } = useLocalSearchParams<{
+  const { title, price, isFree = 'false', sellerId = 's1', sellerName, id } = useLocalSearchParams<{
     title?: string;
     price?: string;
     isFree?: string;
     sellerId?: string;
+    sellerName?: string;
     id?: string;
   }>();
   const router = useRouter();
@@ -34,17 +46,90 @@ export default function CheckoutScreen() {
     []
   );
 
-  const handleConfirm = () => {
+  const handleConfirm = async () => {
     // TODO: Create order via API and get orderId, deduct points/rewards
-    const orderId = `order-${Date.now()}`;
+    let createdOrderId = `order-${Date.now()}`;
+
+    const isDemoProduct = typeof id === 'string' && id.startsWith('demo-');
+
+    // For demo flows, push a local demo order so it appears under My Orders
+    if (isDemoProduct) {
+      const demoOrder = {
+        id: createdOrderId,
+        productName: title ?? 'Rescued Box',
+        sellerId: (sellerId as string) || '',
+        sellerName: sellerName || 'Demo Seller',
+        orderId: createdOrderId,
+        deliveryMethod: 'Pickup only',
+        total: isCommunityGift ? 'RM0' : (price as string) || 'RM0',
+        status: 'To Receive',
+        imageUrl: 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQRQEytqdym2soe7nH5Tqqe4X1GvyNbDbUs0A&s',
+        canRate: false,
+        rated: false,
+      };
+
+      DEMO_ORDERS.unshift(demoOrder as any);
+    } else {
+      try {
+        if (typeof id !== 'string') {
+          Alert.alert('Error', 'Cannot place order: invalid product.');
+          return;
+        }
+
+        const token = getAuthToken();
+        if (!token) {
+          Alert.alert('Authentication Required', 'Please log in as a buyer to place an order.');
+          return;
+        }
+
+        const body: any = {
+          productId: id,
+          paymentMethod: selectedMethod,
+          pointsToUse: usePoints ? pointsToUse : 0,
+        };
+
+        const response = await fetch(`${API_URL}/api/orders`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify(body),
+        });
+
+        if (!response.ok) {
+          let errorMessage = 'Failed to create order';
+          try {
+            const errorData = await response.json();
+            errorMessage = errorData.error || errorData.message || errorMessage;
+          } catch (e) {
+            errorMessage = `${errorMessage} (${response.status})`;
+          }
+          Alert.alert('Error', errorMessage);
+          return;
+        }
+
+        const createdOrder = await response.json();
+        createdOrderId = createdOrder.orderId || createdOrder._id || createdOrderId;
+      } catch (error: any) {
+        console.error('Error creating order:', error);
+        Alert.alert('Error', error?.message || 'Failed to create order. Please try again.');
+        return;
+      }
+    }
+
     Alert.alert('Success', 'Box reserved! You can coordinate pickup with the seller.', [
       {
         text: 'OK',
-        onPress: () =>
+        onPress: () => {
+          // For demo sellers, route to the matching sample chat ID so everything stays in demo mode
+          const targetChatId = DEMO_SELLER_CHAT_IDS[sellerId as string] || sellerId;
+
           router.push({
             pathname: '/chat/[id]',
-            params: { id: sellerId, orderId },
-          }),
+            params: { id: targetChatId, orderId: createdOrderId, name: sellerName },
+          });
+        },
       },
     ]);
   };

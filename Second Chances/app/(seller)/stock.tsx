@@ -274,19 +274,19 @@ export default function StockScreen() {
     <View className="flex-1" style={{ backgroundColor: '#365441' }}>
       <StatusBar barStyle="light-content" />
       
-      {/* Header */}
-      <View
-        className="flex-row items-center justify-between px-4"
-        style={{ backgroundColor: '#2C4A34', paddingTop: 60, paddingBottom: 12 }}
-      >
-        <TouchableOpacity onPress={() => router.push('/(seller)/menu')}>
-          <Menu size={24} stroke="#ffffff" />
-        </TouchableOpacity>
-        <Text className="text-xl font-bold" style={{ color: '#ffffff', fontFamily: 'System' }}>
-          Stock List
-        </Text>
-        <View style={{ width: 24 }} />
-      </View>
+          {/* Header */}
+          <View
+            className="flex-row items-center justify-between px-4"
+            style={{ backgroundColor: '#2C4A34', paddingTop: 60, paddingBottom: 12 }}
+          >
+            <TouchableOpacity onPress={() => router.push('/(seller)/menu')}>
+              <Menu size={24} stroke="#ffffff" />
+            </TouchableOpacity>
+            <Text className="text-xl font-bold" style={{ color: '#ffffff', fontFamily: 'System' }}>
+              Stock List
+            </Text>
+            <View style={{ width: 24 }} />
+          </View>
 
       {/* Navigation Tabs */}
       <View className="px-4 py-3" style={{ backgroundColor: '#365441' }}>
@@ -327,19 +327,19 @@ export default function StockScreen() {
             <ActivityIndicator size="large" color="#E8F3E0" />
           </View>
         ) : (
-          <FlatList
-            data={filteredData}
-            renderItem={renderStockItem}
-            keyExtractor={(item) => item.id}
-            contentContainerStyle={{ padding: 16, paddingBottom: 20 }}
-            ListEmptyComponent={
-              <View className="items-center mt-12">
-                <Text className="text-base" style={{ color: '#E8F3E0', fontFamily: 'System' }}>
-                  No items in this category
-                </Text>
-              </View>
-            }
-          />
+        <FlatList
+          data={filteredData}
+          renderItem={renderStockItem}
+          keyExtractor={(item) => item.id}
+          contentContainerStyle={{ padding: 16, paddingBottom: 20 }}
+          ListEmptyComponent={
+            <View className="items-center mt-12">
+              <Text className="text-base" style={{ color: '#E8F3E0', fontFamily: 'System' }}>
+                No items in this category
+              </Text>
+            </View>
+          }
+        />
         )}
       </View>
 

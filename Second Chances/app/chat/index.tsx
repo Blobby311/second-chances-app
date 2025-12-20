@@ -113,7 +113,7 @@ export default function ChatListScreen() {
       setLoading(true);
 
       const role = isBuyer ? 'buyer' : 'seller';
-      const url = `${API_URL}/api/chat?role=${role}`;
+      const url = `${API_URL}/api/chats?role=${role}`;
       console.log('Fetching chats from:', url);
       
       const response = await fetch(url, {
@@ -152,6 +152,13 @@ export default function ChatListScreen() {
       if (!Array.isArray(data)) {
         console.warn('Invalid chat data format, expected array:', data);
         setChats([]);
+        return;
+      }
+
+      // If there are no real chats yet, fall back to our sample dummy chats
+      if (data.length === 0) {
+        console.log('No chats in API response - showing sample chats');
+        setChats(isBuyer ? SAMPLE_BUYER_CHATS : SAMPLE_SELLER_CHATS);
         return;
       }
 
@@ -233,7 +240,7 @@ export default function ChatListScreen() {
                 return;
               }
 
-              const response = await fetch(`${API_URL}/api/chat/${chatId}`, {
+              const response = await fetch(`${API_URL}/api/chats/${chatId}`, {
                 method: 'DELETE',
                 headers: {
                   'Content-Type': 'application/json',

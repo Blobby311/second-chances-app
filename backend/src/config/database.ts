@@ -26,7 +26,7 @@ export const connectDB = async (): Promise<void> => {
     console.error('4. For free tier: Cluster may auto-pause - wake it up in Atlas dashboard\n');
     // Don't exit in development - let it retry
     if (process.env.NODE_ENV === 'production') {
-      process.exit(1);
+    process.exit(1);
     }
   }
 };

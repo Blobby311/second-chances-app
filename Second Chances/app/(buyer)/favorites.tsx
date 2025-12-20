@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { View, Text, TextInput, TouchableOpacity, FlatList, StatusBar, ImageBackground } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, FlatList, StatusBar, ImageBackground, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Menu, Search, Heart, ShieldCheck, MapPin } from 'lucide-react-native';
 import '../../global.css';
@@ -7,7 +7,7 @@ import '../../global.css';
 // TODO: Replace with API call - This should show all available products from seller's stock
 const ALL_PRODUCTS = [
   {
-    id: '1',
+    id: 'demo-1',
     title: 'Rescued Veggie Box',
     price: 'RM10',
     distance: '2.4 km',
@@ -16,7 +16,7 @@ const ALL_PRODUCTS = [
     imageUrl: 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQRQEytqdym2soe7nH5Tqqe4X1GvyNbDbUs0A&s',
   },
   {
-    id: '2',
+    id: 'demo-2',
     title: 'Sunrise Fruit Crate',
     price: 'RM15',
     distance: '1.2 km',
@@ -25,7 +25,7 @@ const ALL_PRODUCTS = [
     imageUrl: 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRSimGyJxyM2BpGcrcv9_b_lskXGFHA_TPoOw&s',
   },
   {
-    id: '3',
+    id: 'demo-3',
     title: 'Organic Veg Rescue',
     price: 'RM12',
     distance: '3.1 km',
@@ -34,7 +34,7 @@ const ALL_PRODUCTS = [
     imageUrl: 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcS0NTZmv6zIanNf621NF_dJQNoCb4eYQNAAzQ&s',
   },
   {
-    id: '4',
+    id: 'demo-4',
     title: "Neighbor's Free Gift",
     price: 'RM0',
     distance: '4.5 km',
@@ -43,7 +43,7 @@ const ALL_PRODUCTS = [
     imageUrl: 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTmAps3JJfGUb6r7bvZZL6zHjAzgxvMvD2Ijg&s',
   },
   {
-    id: '5',
+    id: 'demo-5',
     title: 'Fresh Fruit Basket',
     price: 'RM18',
     distance: '2.8 km',
@@ -52,7 +52,7 @@ const ALL_PRODUCTS = [
     imageUrl: 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQRQEytqdym2soe7nH5Tqqe4X1GvyNbDbUs0A&s',
   },
   {
-    id: '6',
+    id: 'demo-6',
     title: 'Mixed Veggie Box',
     price: 'RM10',
     distance: '1.9 km',
@@ -66,7 +66,7 @@ export default function FavoritesScreen() {
   const router = useRouter();
   const [searchQuery, setSearchQuery] = useState('');
   // TODO: Replace with API call to get user's favorited items
-  const [favoritedIds, setFavoritedIds] = useState<string[]>(['1', '2', '3']); // Default favorites
+  const [favoritedIds, setFavoritedIds] = useState<string[]>(ALL_PRODUCTS.map((item) => item.id)); // Default favorites
 
   const toggleFavorite = (productId: string) => {
     setFavoritedIds((prev) => {
@@ -94,12 +94,12 @@ export default function FavoritesScreen() {
       <TouchableOpacity
         className="rounded-3xl"
         style={{ backgroundColor: '#E8F3E0' }}
-        onPress={() =>
+        onPress={() => {
           router.push({
             pathname: '/product/[id]',
             params: { id: item.id },
-          })
-        }
+          });
+        }}
       >
         <ImageBackground
           source={{ uri: item.imageUrl }}

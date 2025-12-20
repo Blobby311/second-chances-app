@@ -1,4 +1,5 @@
 import express, { Request, Response } from 'express';
+import mongoose from 'mongoose';
 import { body, validationResult, query } from 'express-validator';
 import Product from '../models/Product';
 import { authenticate, AuthRequest, requireRole } from '../middleware/auth';
@@ -6,6 +7,29 @@ import { upload } from '../middleware/upload';
 import Favorite from '../models/Favorite';
 
 const router = express.Router();
+
+// Helper to build an absolute image URL so mobile apps (especially release APKs)
+// don’t depend on the client to prepend the host correctly.
+const getBaseUrl = (): string => {
+  const base =
+    process.env.PUBLIC_BASE_URL ||
+    process.env.EXPO_PUBLIC_API_BASE_URL ||
+    process.env.API_BASE_URL ||
+    process.env.CLIENT_BASE_URL ||
+    '';
+  if (!base) return '';
+  return base.endsWith('/') ? base.slice(0, -1) : base;
+};
+
+const buildImageUrl = (filename: string): string => {
+  const base = getBaseUrl();
+  // Fall back to relative path if no base is configured (frontend still prefixes API_URL)
+  return base ? `${base}/uploads/${filename}` : `/uploads/${filename}`;
+};
+
+const isValidObjectId = (id: string): boolean => {
+  return /^[0-9a-fA-F]{24}$/.test(id);
+};
 
 // Get products (for buyers - browse)
 router.get(
@@ -80,7 +104,14 @@ router.get(
 // Get product details
 router.get('/:id', async (req: Request, res: Response) => {
   try {
-    const product = await Product.findById(req.params.id).populate(
+    const { id } = req.params;
+
+    // Validate Mongo ObjectId format to avoid casting errors
+    if (!isValidObjectId(id)) {
+      return res.status(400).json({ error: 'Invalid product id' });
+    }
+
+    const product = await Product.findById(id).populate(
       'seller',
       'name avatar isVerified'
     );
@@ -91,7 +122,8 @@ router.get('/:id', async (req: Request, res: Response) => {
 
     res.json(product);
   } catch (error: any) {
-    res.status(500).json({ error: error.message });
+    console.error('Error in GET /api/products/:id', error);
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
@@ -128,7 +160,7 @@ router.post(
         description,
         category,
         price: parseFloat(price),
-        imageUrl: `/uploads/${req.file.filename}`,
+        imageUrl: buildImageUrl(req.file.filename),
         deliveryMethod,
         imperfectLevel: imperfectLevel ? parseInt(imperfectLevel) : 50,
         likelyContents: likelyContents ? JSON.parse(likelyContents) : [],
@@ -152,7 +184,13 @@ router.put(
   upload.single('image'),
   async (req: AuthRequest, res: Response) => {
     try {
-      const product = await Product.findById(req.params.id);
+      const { id } = req.params;
+
+      if (!isValidObjectId(id)) {
+        return res.status(400).json({ error: 'Invalid product id' });
+      }
+
+      const product = await Product.findById(id);
 
       if (!product) {
         return res.status(404).json({ error: 'Product not found' });
@@ -164,7 +202,7 @@ router.put(
 
       const updateData: any = { ...req.body };
       if (req.file) {
-        updateData.imageUrl = `/uploads/${req.file.filename}`;
+        updateData.imageUrl = buildImageUrl(req.file.filename);
       }
       if (updateData.price) {
         updateData.price = parseFloat(updateData.price);
@@ -176,7 +214,7 @@ router.put(
         updateData.likelyContents = JSON.parse(updateData.likelyContents);
       }
 
-      const updated = await Product.findByIdAndUpdate(req.params.id, updateData, {
+      const updated = await Product.findByIdAndUpdate(id, updateData, {
         new: true,
         runValidators: true,
       });
@@ -191,7 +229,13 @@ router.put(
 // Delete product (seller only)
 router.delete('/:id', authenticate, requireRole(['seller']), async (req: AuthRequest, res: Response) => {
   try {
-    const product = await Product.findById(req.params.id);
+    const { id } = req.params;
+
+    if (!isValidObjectId(id)) {
+      return res.status(400).json({ error: 'Invalid product id' });
+    }
+
+    const product = await Product.findById(id);
 
     if (!product) {
       return res.status(404).json({ error: 'Product not found' });
@@ -201,7 +245,7 @@ router.delete('/:id', authenticate, requireRole(['seller']), async (req: AuthReq
       return res.status(403).json({ error: 'Not authorized' });
     }
 
-    await Product.findByIdAndDelete(req.params.id);
+    await Product.findByIdAndDelete(id);
     res.json({ message: 'Product deleted successfully' });
   } catch (error: any) {
     res.status(500).json({ error: error.message });

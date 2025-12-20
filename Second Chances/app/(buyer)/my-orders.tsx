@@ -6,6 +6,10 @@ import '../../global.css';
 import { API_URL } from '../../config/api';
 import { getAuthToken } from '../../config/auth';
 
+// In-memory demo orders so checkout can push fake reserves that show up here
+// This is intentionally simple and non-persistent, just for demo flows.
+export const DEMO_ORDERS: any[] = [];
+
 const TABS = ['To Receive', 'Completed', 'Cancelled'];
 
 interface OrderItem {
@@ -28,7 +32,7 @@ export default function MyOrdersScreen() {
   const [orders, setOrders] = useState<OrderItem[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Fetch orders from API
+  // Fetch orders from API, then merge any in-memory demo orders for the selected tab
   const fetchOrders = async () => {
     try {
       setLoading(true);
@@ -81,10 +85,11 @@ export default function MyOrdersScreen() {
       }
 
       const data = await response.json();
-      console.log('Orders fetched successfully:', data.length, 'orders');
+      const apiOrders = Array.isArray(data) ? data : [];
+      console.log('Orders fetched successfully:', apiOrders.length, 'orders');
 
       // Transform backend data to frontend format
-      const formattedOrders: OrderItem[] = data.map((order: any) => {
+      const formattedOrders: OrderItem[] = apiOrders.map((order: any) => {
         const product = order.product || {};
         const seller = order.seller || {};
         
@@ -110,7 +115,16 @@ export default function MyOrdersScreen() {
         };
       });
 
-      setOrders(formattedOrders);
+      // Merge in demo orders which match the current tab's logical grouping
+      const merged = [...formattedOrders];
+      for (const demoOrder of DEMO_ORDERS) {
+        // Simple mapping: demo orders always appear under "To Receive" initially
+        if (selectedTab === 'To Receive') {
+          merged.unshift(demoOrder);
+        }
+      }
+
+      setOrders(merged);
     } catch (error: any) {
       console.error('Error fetching orders:', error);
       const errorMessage = error?.message || 'Failed to load orders';

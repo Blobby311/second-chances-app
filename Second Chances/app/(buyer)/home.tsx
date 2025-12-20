@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
-import { View, Text, TextInput, TouchableOpacity, FlatList, StatusBar, ImageBackground, PanResponder, Dimensions, BackHandler, ActivityIndicator } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, FlatList, StatusBar, ImageBackground, PanResponder, Dimensions, BackHandler, ActivityIndicator, Alert } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { Menu, Search, ShieldCheck, MapPin, Heart } from 'lucide-react-native';
 import '../../global.css';
@@ -9,6 +9,65 @@ const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 const FILTERS = ['All', 'Free Gifts', 'Veg', 'Fruit'];
 
+// Demo products shown on the home screen when there are no real products from the API.
+// IDs and names match the demo favorites and product detail screen.
+const DEMO_HOME_PRODUCTS = [
+  {
+    id: 'demo-1',
+    name: 'Rescued Veggie Box',
+    price: 10,
+    imageUrl: 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQRQEytqdym2soe7nH5Tqqe4X1GvyNbDbUs0A&s',
+    category: 'Veg',
+    isFree: false,
+    isVerified: true,
+  },
+  {
+    id: 'demo-2',
+    name: 'Sunrise Fruit Crate',
+    price: 15,
+    imageUrl: 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRSimGyJxyM2BpGcrcv9_b_lskXGFHA_TPoOw&s',
+    category: 'Fruit',
+    isFree: false,
+    isVerified: true,
+  },
+  {
+    id: 'demo-3',
+    name: 'Organic Veg Rescue',
+    price: 12,
+    imageUrl: 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcS0NTZmv6zIanNf621NF_dJQNoCb4eYQNAAzQ&s',
+    category: 'Veg',
+    isFree: false,
+    isVerified: true,
+  },
+  {
+    id: 'demo-4',
+    name: "Neighbor's Free Gift",
+    price: 0,
+    imageUrl: 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTmAps3JJfGUb6r7bvZZL6zHjAzgxvMvD2Ijg&s',
+    category: 'Mixed',
+    isFree: true,
+    isVerified: true,
+  },
+  {
+    id: 'demo-5',
+    name: 'Fresh Fruit Basket',
+    price: 18,
+    imageUrl: 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQRQEytqdym2soe7nH5Tqqe4X1GvyNbDbUs0A&s',
+    category: 'Fruit',
+    isFree: false,
+    isVerified: true,
+  },
+  {
+    id: 'demo-6',
+    name: 'Mixed Veggie Box',
+    price: 10,
+    imageUrl: 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRSimGyJxyM2BpGcrcv9_b_lskXGFHA_TPoOw&s',
+    category: 'Veg',
+    isFree: false,
+    isVerified: false,
+  },
+];
+
 export default function BuyerHomeScreen() {
   const router = useRouter();
   const [searchQuery, setSearchQuery] = useState('');
@@ -17,7 +76,7 @@ export default function BuyerHomeScreen() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // TODO: Replace with API call to get user's favorited items
-  const [favoritedIds, setFavoritedIds] = useState<string[]>(['1', '2', '3']); // Default favorites
+  const [favoritedIds, setFavoritedIds] = useState<string[]>([]); // Default favorites
 
   const toggleFavorite = (productId: string) => {
     setFavoritedIds((prev) => {
@@ -93,10 +152,22 @@ export default function BuyerHomeScreen() {
           throw new Error(data?.error || 'Failed to load products');
         }
 
-        setProducts(data);
+        if (Array.isArray(data) && data.length > 0) {
+          if (activeFilter === 'All') {
+            // For the main "All" view, show demo blindboxes together with real products
+            setProducts([...DEMO_HOME_PRODUCTS, ...data]);
+          } else {
+            setProducts(data);
+          }
+        } else {
+          // No real products from API - show demo products
+          setProducts(DEMO_HOME_PRODUCTS);
+        }
       } catch (err: any) {
         if (err.name !== 'AbortError') {
           setError('Unable to load products. Please try again.');
+          // On errors (e.g., server unavailable), also fall back to demo products
+          setProducts(DEMO_HOME_PRODUCTS);
         }
       } finally {
         setLoading(false);
@@ -125,12 +196,26 @@ export default function BuyerHomeScreen() {
       <TouchableOpacity
         className="rounded-3xl"
         style={{ backgroundColor: '#E8F3E0' }}
-        onPress={() =>
+        onPress={() => {
+          if (!productId) {
+            Alert.alert('Cannot open product', 'This product is not available to view.');
+            return;
+          }
+
+          const idStr = String(productId);
+          const isDemo = idStr.startsWith('demo-');
+
+          // Only block clearly invalid, non-demo IDs
+          if (!isDemo && !/^[0-9a-fA-F]{24}$/.test(idStr)) {
+            Alert.alert('Cannot open product', 'This product is not available to view.');
+            return;
+          }
+
           router.push({
             pathname: '/product/[id]',
-            params: { id: productId },
-          })
-        }
+            params: { id: idStr },
+          });
+        }}
       >
         <ImageBackground
           source={{ uri: imageUri }}

@@ -1,5 +1,5 @@
 import React, { useRef } from 'react';
-import { View, Text, TouchableOpacity, StatusBar, ScrollView, PanResponder, Dimensions, Image } from 'react-native';
+import { View, Text, TouchableOpacity, StatusBar, ScrollView, PanResponder, Dimensions, Image, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Menu, Bell, Coins } from 'lucide-react-native';
 import '../../global.css';
@@ -48,7 +48,7 @@ const NOTIFICATIONS_DATA = [
     type: 'favorite',
     message: "Great news! Your favorited 'Organic Veg Rescue' is back in stock nearby.",
     isUnread: false,
-    relatedId: '3', // product ID
+    relatedId: null, // product ID unavailable in demo data
     imageUrl: 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcS0NTZmv6zIanNf621NF_dJQNoCb4eYQNAAzQ&s',
     badgeImage: null,
   },
@@ -66,8 +66,17 @@ const NOTIFICATIONS_DATA = [
     type: 'product',
     message: "New blindbox available near you: 'Fresh Fruit Basket' - Only 2km away!",
     isUnread: false,
-    relatedId: '5', // product ID
+    relatedId: null, // product ID unavailable in demo data
     imageUrl: 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQRQEytqdym2soe7nH5Tqqe4X1GvyNbDbUs0A&s',
+    badgeImage: null,
+  },
+  {
+    id: '7',
+    type: 'product',
+    message: "Limited time community gift: 'Neighbor's Free Gift'",
+    isUnread: false,
+    relatedId: null,
+    imageUrl: 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTmAps3JJfGUb6r7bvZZL6zHjAzgxvMvD2Ijg&s',
     badgeImage: null,
   },
 ];
@@ -99,14 +108,14 @@ export default function NotificationsScreen() {
       // Navigate to order detail or my orders page
       router.push(`/(buyer)/my-orders`);
     } else if (item.type === 'product') {
-      // Navigate to product detail if we have the ID, otherwise home
-      if (item.relatedId) {
+      // Navigate to product detail if we have a valid ID, otherwise home
+      if (item.relatedId && /^[0-9a-fA-F]{24}$/.test(item.relatedId)) {
         router.push({
           pathname: '/product/[id]',
           params: { id: item.relatedId },
         });
       } else {
-        router.push('/(buyer)/home');
+        Alert.alert('Cannot open product', 'This product is not available to view.');
       }
     } else if (item.type === 'favorite') {
       // Navigate to favorites
