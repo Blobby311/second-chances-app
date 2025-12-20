@@ -22,38 +22,54 @@ import { getAuthToken } from '../../config/auth';
 const BUYER_QUICK_REPLIES = ['Is 5 PM okay?', "I'm here", 'Thank you!'];
 const SELLER_QUICK_REPLIES = ['Your order is ready!', 'When can you pick up?', 'Thank you for your order!'];
 
-// Sample messages for testing/fallback
-const SAMPLE_MESSAGES: Message[] = [
-  {
-    id: 'sample-msg-1',
-    sender: 'seller',
-    senderId: 'sample-seller',
-    content: 'Hi! Your order is ready for pickup. When would you like to collect it?',
-    timestamp: '2h ago',
-    createdAt: new Date(Date.now() - 2 * 60 * 60 * 1000),
+// --- NEW: Detailed Sample Data for Each Chat ---
+const SAMPLE_CHAT_DATA = {
+  'sample-1': {
+    partner: {
+      name: 'Uncle Roger',
+      avatar: 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSa3du6j726GP7-rDxHda8-FYopWptm3LsTWA&s',
+    },
+    messages: [
+      { id: 'ur-1', sender: 'seller', content: 'Your veggie box is ready for pickup, Uncle Roger!', timestamp: '1h ago', createdAt: new Date(Date.now() - 3600000) },
+      { id: 'ur-2', sender: 'buyer', content: 'Fuiyoh! So fast! I come now.', timestamp: '59m ago', createdAt: new Date(Date.now() - 3540000) },
+    ],
   },
-  {
-    id: 'sample-msg-2',
-    sender: 'buyer',
-    senderId: 'sample-buyer',
-    content: 'Is 5 PM okay?',
-    timestamp: '1h ago',
-    createdAt: new Date(Date.now() - 60 * 60 * 1000),
+  'sample-2': {
+    partner: {
+      name: 'Kak Siti',
+      avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=400&q=60',
+    },
+    messages: [
+      { id: 'ks-1', sender: 'seller', content: 'Hi Kak Siti, your order is confirmed.', timestamp: '2h ago', createdAt: new Date(Date.now() - 7200000) },
+      { id: 'ks-2', sender: 'buyer', content: 'Thank you for your help!', timestamp: '1h ago', createdAt: new Date(Date.now() - 3600000) },
+    ],
   },
-  {
-    id: 'sample-msg-3',
-    sender: 'seller',
-    senderId: 'sample-seller',
-    content: 'Perfect! See you at 5 PM then!',
-    timestamp: 'Just now',
-    createdAt: new Date(),
+  'sample-b1': {
+    partner: {
+      name: 'Ahmad bin Abdullah',
+      avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=400&q=60',
+    },
+    messages: [
+      { id: 'aa-1', sender: 'buyer', content: 'Hi, is this still available?', timestamp: '30m ago', createdAt: new Date(Date.now() - 1800000) },
+    ],
   },
-];
+  'sample-b2': {
+    partner: {
+      name: 'Siti Nurhaliza',
+      avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=400&q=60',
+    },
+    messages: [
+      { id: 'sn-1', sender: 'buyer', content: 'Assalamualaikum, bila saya boleh pick up ye?', timestamp: '10m ago', createdAt: new Date(Date.now() - 600000) },
+      { id: 'sn-2', sender: 'seller', content: 'Waalaikumsalam, anytime after 3 PM is fine!', timestamp: 'Just now', createdAt: new Date() },
+    ],
+  },
+};
+// --- END NEW SAMPLE DATA ---
 
 interface Message {
   id: string;
   sender: string;
-  senderId: string;
+  senderId?: string;
   content: string;
   timestamp: string;
   createdAt: Date;
@@ -129,37 +145,28 @@ export default function ChatScreen() {
 
       // Handle 404 - check if it's a sample chat, otherwise it's a real chat that needs to be created
       if (response.status === 404) {
-        // Only show sample messages if it's actually a sample chat ID
+        // --- UPDATED LOGIC ---
         if (chatId.startsWith('sample-')) {
-          console.log('Sample chat (404) - showing sample messages for testing');
-          setMessages(SAMPLE_MESSAGES);
-          setChatPartner({
-            name: 'Uncle Roger',
-            avatar: 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSa3du6j726GP7-rDxHda8-FYopWptm3LsTWA&s',
-            online: false,
-          });
-          setLoading(false);
-          return;
+          const sampleData = SAMPLE_CHAT_DATA[chatId as keyof typeof SAMPLE_CHAT_DATA];
+          if (sampleData) {
+            setChatPartner({ ...sampleData.partner, online: false });
+            setMessages(sampleData.messages);
+          } else {
+            setChatPartner({ name: 'Sample User', avatar: '', online: false });
+            setMessages([]);
+          }
+        } else {
+          console.log('New chat (404) - chat will be created when first message is sent');
+          setMessages([]);
+          setChatPartner({ name: 'User', avatar: '', online: false });
         }
-        // For real user IDs, the backend will create the chat automatically
-        // Set empty messages - user can send first message
-        console.log('New chat (404) - chat will be created when first message is sent');
-        setMessages([]);
-        // Try to get partner info from chat list or user profile
-        // We'll try to get it when the chat is actually created
-        // For now, set a generic partner
-        setChatPartner({
-          name: 'User',
-          avatar: '',
-          online: false,
-        });
         setLoading(false);
         return;
+        // --- END UPDATED LOGIC ---
       } else if (!response.ok) {
         const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
         const errorMessage = errorData?.error || errorData?.message || `Failed with status ${response.status}`;
         console.error('Error loading messages:', response.status, errorMessage);
-        // For 403, user doesn't have access - show error
         if (response.status === 403) {
           Alert.alert('Access Denied', 'You do not have permission to view this chat.');
           router.back();
@@ -201,44 +208,27 @@ export default function ChatScreen() {
           }
         } catch (error) {
           console.warn('Could not fetch chat info for partner details:', error);
-          // Continue anyway - we can still show messages without partner info
         }
       }
 
       const data = response.ok ? await response.json() : [];
       console.log('Messages loaded successfully:', Array.isArray(data) ? data.length : 0, 'messages');
       
-      // Determine partner from chat info
       let userIsSeller = false;
       if (chatInfo) {
-        // Determine if current user is buyer or seller
         const buyerId = chatInfo.buyer?._id || chatInfo.buyer;
-        const sellerId = chatInfo.seller?._id || chatInfo.seller;
         const isCurrentUserBuyer = buyerId === userId;
         userIsSeller = !isCurrentUserBuyer;
         setIsSeller(userIsSeller);
         
-        // Set chat partner
         if (isCurrentUserBuyer) {
-          setChatPartner({
-            name: chatInfo.seller?.name || 'Seller',
-            avatar: chatInfo.seller?.avatar || '',
-            online: false, // TODO: Implement online status
-          });
+          setChatPartner({ name: chatInfo.seller?.name || 'Seller', avatar: chatInfo.seller?.avatar || '', online: false });
         } else {
-          setChatPartner({
-            name: chatInfo.buyer?.name || 'Buyer',
-            avatar: chatInfo.buyer?.avatar || '',
-            online: false, // TODO: Implement online status
-          });
+          setChatPartner({ name: chatInfo.buyer?.name || 'Buyer', avatar: chatInfo.buyer?.avatar || '', online: false });
         }
       }
 
-      // Format messages
-      // If we couldn't determine role from chatInfo, try to infer from messages
-      // This is a fallback - we'll determine per message if needed
       if (!chatInfo && Array.isArray(data) && data.length > 0) {
-        // Default to buyer role if we can't determine
         userIsSeller = false;
         setIsSeller(false);
       }
@@ -261,44 +251,15 @@ export default function ChatScreen() {
       setMessages(formattedMessages);
     } catch (error: any) {
       console.error('Error loading messages:', error);
-      console.error('Error details:', {
-        message: error?.message,
-        stack: error?.stack,
-        chatId,
-        apiUrl: API_URL,
-      });
-      
-      // Check if it's a network error (backend not reachable)
-      if (error?.message === 'Network request failed' || error?.message?.includes('Network')) {
-        console.warn('Network error - backend may not be reachable. Check if backend is running at:', API_URL);
-        // Still show sample messages for UI testing, but log the issue
-        if (chatId.startsWith('sample-')) {
-          setMessages(SAMPLE_MESSAGES);
-          setChatPartner({
-            name: 'Uncle Roger',
-            avatar: 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSa3du6j726GP7-rDxHda8-FYopWptm3LsTWA&s',
-            online: false,
-          });
-        } else {
-          // For real chats with network errors, show empty state with a message
-          setMessages([]);
-          setChatPartner({
-            name: 'User',
-            avatar: '',
-            online: false,
-          });
-        }
-      } else {
-        // Other errors - show sample messages as fallback
-        if (chatId.startsWith('sample-')) {
-          setMessages(SAMPLE_MESSAGES);
-          setChatPartner({
-            name: 'Uncle Roger',
-            avatar: 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSa3du6j726GP7-rDxHda8-FYopWptm3LsTWA&s',
-            online: false,
-          });
+      // --- UPDATED FALLBACK LOGIC ---
+      if (chatId.startsWith('sample-')) {
+        const sampleData = SAMPLE_CHAT_DATA[chatId as keyof typeof SAMPLE_CHAT_DATA];
+        if (sampleData) {
+          setChatPartner({ ...sampleData.partner, online: false });
+          setMessages(sampleData.messages);
         }
       }
+      // --- END UPDATED LOGIC ---
     } finally {
       setLoading(false);
     }
@@ -330,7 +291,6 @@ export default function ChatScreen() {
       Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
       (e) => {
         setKeyboardHeight(e.endCoordinates.height);
-        // Scroll to end when keyboard appears
         setTimeout(() => {
           flatListRef.current?.scrollToEnd({ animated: true });
         }, 100);
@@ -352,7 +312,6 @@ export default function ChatScreen() {
   const sendMessage = async (text: string) => {
     if (!text.trim() || sending || !chatId) return;
 
-    // Check if this is a sample/dummy chat
     if (chatId.startsWith('sample-')) {
       Alert.alert(
         'Demo Chat',
@@ -372,7 +331,6 @@ export default function ChatScreen() {
       createdAt: new Date(),
     };
 
-    // Optimistically add message
     setMessages((prev) => [...prev, tempMessage]);
     setInput('');
     setSending(true);
@@ -397,13 +355,11 @@ export default function ChatScreen() {
         throw new Error(errorData?.error || 'Failed to send message');
       }
 
-      // Reload messages to get the real message from server
       await loadMessages();
     } catch (error: any) {
       console.error('Error sending message:', error);
-      // Remove temp message on error
       setMessages((prev) => prev.filter((msg) => msg.id !== tempId));
-      setInput(text); // Restore input
+      setInput(text);
       Alert.alert('Error', error?.message || 'Failed to send message. Please try again.');
     } finally {
       setSending(false);
@@ -411,9 +367,7 @@ export default function ChatScreen() {
   };
 
   const handleCompleteTransaction = () => {
-    // TODO: Mark transaction as complete via API
     setIsComplete(true);
-    // Navigate to rating screen
     const order = orderId || `order-${Date.now()}`;
     router.push({
       pathname: '/rating/[orderId]',
@@ -443,7 +397,6 @@ export default function ChatScreen() {
             <TouchableOpacity 
               className="flex-row items-center flex-1"
               onPress={() => {
-                // Only navigate to seller profile if chatting with a seller
                 if (!isSeller && chatId) {
                   router.push(`/seller-profile/${chatId}`);
                 }

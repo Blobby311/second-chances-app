@@ -273,7 +273,11 @@ export default function ChatListScreen() {
       }
       setSwipedItemId(null);
     }
-    router.push(`/chat/${chat.chatId}`);
+    // Use canonical chatId (if provided) to avoid mismatches between id/chatId
+    const targetId = (chat as any).chatId || chat.id;
+    const navPath = `/chat/${encodeURIComponent(targetId)}?name=${encodeURIComponent(chat.name)}`;
+    console.log('[ChatList] handleChatPress -> navigating to', { targetId, name: chat.name, navPath });
+    router.push(navPath);
   };
 
   const createPanResponder = (itemId: string) => {

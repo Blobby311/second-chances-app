@@ -107,11 +107,11 @@ export default function CreateNewScreen() {
       // Add image file
       const imageUri = blindboxImage;
       const filename = imageUri.split('/').pop() || 'image.jpg';
-      const match = /\.(\w+)$/.exec(filename);
+      const match = /\.([a-zA-Z0-9]+)$/i.exec(filename);
       const type = match ? `image/${match[1]}` : 'image/jpeg';
       
       formData.append('image', {
-        uri: imageUri,
+        uri: Platform.OS === 'android' ? imageUri : imageUri.replace('file://', ''),
         name: filename,
         type: type,
       } as any);
@@ -452,4 +452,3 @@ export default function CreateNewScreen() {
     </View>
   );
 }
-
