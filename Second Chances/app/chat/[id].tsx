@@ -93,6 +93,7 @@ export default function ChatScreen() {
     avatar: string;
     online: boolean;
   } | null>(initialName ? { name: initialName as string, avatar: '', online: false } : null);
+  const [chatPartnerId, setChatPartnerId] = useState<string | null>(null);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [isSeller, setIsSeller] = useState<boolean>(false);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
@@ -256,15 +257,27 @@ export default function ChatScreen() {
       let userIsSeller = false;
       if (chatInfo) {
         const buyerId = chatInfo.buyer?._id || chatInfo.buyer;
+        const sellerId = chatInfo.seller?._id || chatInfo.seller;
         const isCurrentUserBuyer = buyerId === userId;
         userIsSeller = !isCurrentUserBuyer;
         setIsSeller(userIsSeller);
-        
+
         if (isCurrentUserBuyer) {
+          // Current user is buyer, partner is seller
           setChatPartner({ name: chatInfo.seller?.name || 'Seller', avatar: chatInfo.seller?.avatar || '', online: false });
+          if (sellerId) {
+            setChatPartnerId(String(sellerId));
+          }
         } else {
+          // Current user is seller, partner is buyer
           setChatPartner({ name: chatInfo.buyer?.name || 'Buyer', avatar: chatInfo.buyer?.avatar || '', online: false });
+          if (buyerId) {
+            setChatPartnerId(String(buyerId));
+          }
         }
+      } else {
+        // If we couldn't resolve a structured chat info, avoid carrying over a stale partner ID
+        setChatPartnerId(null);
       }
 
       if (!chatInfo && Array.isArray(data) && data.length > 0) {
@@ -423,9 +436,11 @@ export default function ChatScreen() {
   const handleCompleteTransaction = () => {
     setIsComplete(true);
     const order = orderId || `order-${Date.now()}`;
+    // Use the resolved chat partner ID (real seller user ID) when available
+    const targetSellerId = chatPartnerId || chatId;
     router.push({
       pathname: '/rating/[orderId]',
-      params: { orderId: order, sellerId: chatId },
+      params: { orderId: order, sellerId: targetSellerId },
     });
   };
 
@@ -451,8 +466,11 @@ export default function ChatScreen() {
             <TouchableOpacity 
               className="flex-row items-center flex-1"
               onPress={() => {
-                if (!isSeller && chatId) {
-                  router.push(`/seller-profile/${chatId}`);
+                // Only buyers should navigate to a seller profile, and only when we
+                // have a resolved partner user ID. For demo/sample chats, this will
+                // remain local-only and not hit the backend.
+                if (!isSeller && chatPartnerId) {
+                  router.push(`/seller-profile/${encodeURIComponent(chatPartnerId)}`);
                 }
               }}
             >
