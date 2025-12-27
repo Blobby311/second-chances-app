@@ -113,7 +113,7 @@ export default function ChatListScreen() {
       setLoading(true);
 
       const role = isBuyer ? 'buyer' : 'seller';
-      const url = `${API_URL}/api/chats?role=${role}`;
+      const url = `${API_URL}/api/chat?role=${role}`;
       console.log('Fetching chats from:', url);
       
       const response = await fetch(url, {
@@ -240,7 +240,7 @@ export default function ChatListScreen() {
                 return;
               }
 
-              const response = await fetch(`${API_URL}/api/chats/${chatId}`, {
+              const response = await fetch(`${API_URL}/api/chat/${chatId}`, {
                 method: 'DELETE',
                 headers: {
                   'Content-Type': 'application/json',

@@ -16,14 +16,22 @@
     ],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.veggieroulette.app"
+      "bundleIdentifier": "com.veggieroulette.app",
+      "config": {
+        "googleMapsApiKey": "AIzaSyB8FkKUazKdKoypw8i0kywUG0mYGjm9AQg"
+      }
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/logo.png",
         "backgroundColor": "#365441"
       },
-      "package": "com.veggieroulette.app"
+      "package": "com.veggieroulette.app",
+      "config": {
+        "googleMaps": {
+          "apiKey": "AIzaSyB8FkKUazKdKoypw8i0kywUG0mYGjm9AQg"
+        }
+      }
     },
     "web": {
       "favicon": "./assets/favicon.png"
