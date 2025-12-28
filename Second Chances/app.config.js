@@ -1,0 +1,60 @@
+import 'dotenv/config';
+
+export default {
+  expo: {
+    name: "Second Chances",
+    slug: "secondchances",
+    version: "1.0.0",
+    orientation: "portrait",
+    icon: "./assets/logo.png",
+    userInterfaceStyle: "light",
+    splash: {
+      image: "./assets/splash.png",
+      resizeMode: "contain",
+      backgroundColor: "#365441"
+    },
+    assetBundlePatterns: [
+      "**/*"
+    ],
+    ios: {
+      supportsTablet: true,
+      bundleIdentifier: "com.veggieroulette.app",
+      config: {
+        googleMapsApiKey: process.env.GOOGLE_MAPS_API_KEY
+      }
+    },
+    android: {
+      adaptiveIcon: {
+        foregroundImage: "./assets/logo.png",
+        backgroundColor: "#365441"
+      },
+      package: "com.veggieroulette.app",
+      config: {
+        googleMaps: {
+          apiKey: process.env.GOOGLE_MAPS_API_KEY
+        }
+      }
+    },
+    web: {
+      "favicon": "./assets/favicon.png"
+    },
+    scheme: "veggieroulette",
+    plugins: [
+      "expo-router",
+      "expo-secure-store"
+    ],
+    extra: {
+      router: {},
+      eas: {
+        projectId: "1a486ba9-18fc-4d13-81b2-f7b1c243a542"
+      }
+    },
+    owner: "blobby31",
+    runtimeVersion: {
+      policy: "appVersion"
+    },
+    updates: {
+      url: "https://u.expo.dev/1a486ba9-18fc-4d13-81b2-f7b1c243a542"
+    }
+  }
+};
